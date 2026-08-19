@@ -7,13 +7,31 @@ Révision finale : `050f71474648a88c470640c1b820aff9b8aa6113` ("End of training"
 
 ---
 
-## Phase 0 — Nettoyage (5 min)
+## Phase 0 — Nettoyage  (1 item restant)
 
-- [ ] `train_xlam_job.py` : corriger le commentaire de `hub_strategy="every_save"`
-      → il pousse à CHAQUE save (10 commits sur le Hub le prouvent), pas une fois à la fin.
-- [ ] `eval_xlam.py` : supprimer la variable `tools` (l.12-14), définie mais jamais utilisée.
-- [ ] Renommer `eval_xlam.py` → `inspect_xlam.py`. C'est un outil d'inspection à 1 exemple,
-      pas une éval. Le garder pour déboguer le format, ne jamais en tirer un chiffre.
+- [ ] `train_xlam_job.py:112` : corriger le commentaire de `hub_strategy="every_save"`
+      ⚠️ SEUL ITEM RESTANT de la Phase 0 — et il a RÉGRESSÉ.
+      État actuel : `hub_strategy="every_save", # pousse une fois à la fin`
+      Le commentaire faux a été réintroduit (cf. `git diff`).
+      FAIT : `every_save` pousse à CHAQUE `save_steps` (= tous les 500 steps ici).
+      Preuve : 10 commits sur le Hub, "Training in progress, step 500/1000/.../3500".
+      C'est `hub_strategy="end"` qui pousse une seule fois à la fin.
+      Commentaire correct possible : `# pousse à chaque save_steps (≈8 checkpoints)`
+- [x] Variable `tools` morte retirée de `inspect_xlam.py`.
+- [x] `eval_xlam.py` supprimé, remplacé par `inspect_xlam.py`. C'est un outil d'inspection
+      à 1 exemple, pas une éval : le garder pour déboguer le format, ne jamais en tirer un chiffre.
+
+### Phase 0 bis — Versionnage  ✅ FAIT (2026-08-19)
+- [x] `git init` dans le projet.
+- [x] `.gitignore` : `.venv/`, `sft_output/`, `__pycache__/`, `*.pyc`, `.DS_Store`.
+      (Le `.venv` fait 889 Mo / 26 320 fichiers — sans ça le dépôt était inexploitable.)
+- [x] `git status --short` vérifié : 5 fichiers attendus, pas de `.venv`.
+- [x] Premier commit fait : `ace073e` "Init: fine-tuning xLAM + todo eval + suivi apprentissage".
+- [ ] Commit de suivi après correction de la ligne 112.
+
+**Piège shell rencontré** : `git init /Users/chloe/projects/Fine tuning` échoue —
+l'espace dans le chemin est découpé par le shell en 2 arguments (word splitting).
+Toujours guillemeter un chemin contenant un espace : `git init "/chemin/avec espace"`.
 
 ## Phase 1 — L'éval minimale qui vaut quelque chose
 

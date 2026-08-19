@@ -109,7 +109,7 @@ def main() -> None:
         push_to_hub=True,
         hub_model_id=HUB_MODEL_ID,
         hub_private_repo=False,
-        hub_strategy="every_save", 
+        hub_strategy="every_save", # pousse à chaque save_steps (≈8 checkpoints)
         seed=SEED,
         report_to="trackio",  # suivi des courbes ; "none" pour désactiver
     )
