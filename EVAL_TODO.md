@@ -7,16 +7,14 @@ Révision finale : `050f71474648a88c470640c1b820aff9b8aa6113` ("End of training"
 
 ---
 
-## Phase 0 — Nettoyage  (1 item restant)
+## Phase 0 — Nettoyage  ✅ FAIT (2026-08-19)
 
-- [ ] `train_xlam_job.py:112` : corriger le commentaire de `hub_strategy="every_save"`
-      ⚠️ SEUL ITEM RESTANT de la Phase 0 — et il a RÉGRESSÉ.
-      État actuel : `hub_strategy="every_save", # pousse une fois à la fin`
-      Le commentaire faux a été réintroduit (cf. `git diff`).
-      FAIT : `every_save` pousse à CHAQUE `save_steps` (= tous les 500 steps ici).
+- [x] `train_xlam_job.py:112` : commentaire de `hub_strategy` corrigé.
+      Désormais : `# pousse à chaque save_steps (≈8 checkpoints)`.
+      Le fait à retenir : `every_save` pousse à CHAQUE `save_steps` (tous les 500 ici).
       Preuve : 10 commits sur le Hub, "Training in progress, step 500/1000/.../3500".
       C'est `hub_strategy="end"` qui pousse une seule fois à la fin.
-      Commentaire correct possible : `# pousse à chaque save_steps (≈8 checkpoints)`
+      Commitée dans `3744ca5`.
 - [x] Variable `tools` morte retirée de `inspect_xlam.py`.
 - [x] `eval_xlam.py` supprimé, remplacé par `inspect_xlam.py`. C'est un outil d'inspection
       à 1 exemple, pas une éval : le garder pour déboguer le format, ne jamais en tirer un chiffre.
@@ -27,7 +25,10 @@ Révision finale : `050f71474648a88c470640c1b820aff9b8aa6113` ("End of training"
       (Le `.venv` fait 889 Mo / 26 320 fichiers — sans ça le dépôt était inexploitable.)
 - [x] `git status --short` vérifié : 5 fichiers attendus, pas de `.venv`.
 - [x] Premier commit fait : `ace073e` "Init: fine-tuning xLAM + todo eval + suivi apprentissage".
-- [ ] Commit de suivi après correction de la ligne 112.
+- [x] Commit de suivi fait : `3744ca5` "Corrige le commentaire hub_strategy".
+      Historique actuel : `ace073e` (init) -> `3744ca5` (fix ligne 112).
+
+>>> PHASE 0 CLOSE. Prochaine action : 1.2 (reconstruire le split held-out). <<<
 
 **Piège shell rencontré** : `git init /Users/chloe/projects/Fine tuning` échoue —
 l'espace dans le chemin est découpé par le shell en 2 arguments (word splitting).
@@ -70,7 +71,24 @@ et la loss résiduelle est sur les tokens de CONTENU (valeurs d'arguments).
 Prédiction : niveaux 1-2 très hauts, chute entre les niveaux 5 et 6.
 Si l'éval confirme -> le problème n'est pas le fine-tuning mais la capacité du 135M.
 
-### 1.2 Reconstruire le split held-out
+### 1.2 Reconstruire le split held-out  ✅ FAIT (2026-08-19)
+- [x] `eval_xlam_job.py` créé, en-tête PEP 723.
+- [x] Split reproduit : `load_dataset` -> `map(to_messages)` -> `train_test_split(0.05, seed=42)`.
+- [x] `remove_columns` SUPPRIMÉ (c'est lui qui détruisait `answers`).
+      Bonus : on garde `tools` (niveau 3, hallucination) et `query` (analyse d'erreurs).
+- [x] `select(range(EVAL_SKIP, len(split["test"])))` — saute les 500 vus pendant le train.
+      Ni 500 ni 3000 en dur : constante nommée + longueur dérivée.
+- [x] VÉRIFIÉ EN VRAI : `len(eval_dataset)` = 2500 ✅
+      `column_names` = ['id','query','answers','tools','messages'] ✅
+- [ ] RESTE : test de doublons. `train_test_split` partitionne, donc aucune ligne
+      commune par construction — mais xLAM-60k peut contenir des `query` EN DOUBLE.
+      Même texte, deux lignes distinctes, une de chaque côté du split = contamination réelle.
+      Test qui vaut : intersection des ensembles de `query` train vs éval. Doit être vide.
+
+**Leçon retenue** : un script qui se termine en silence ne valide rien.
+Toujours afficher de quoi confirmer (longueur attendue, colonnes attendues).
+
+### 1.2 bis — ancienne rédaction (conservée pour mémoire)
 - [ ] Nouveau fichier `eval_xlam_job.py`, en-tête PEP 723 comme `train_xlam_job.py`.
 - [ ] Reproduire EXACTEMENT : `load_dataset` → `map(to_messages)` → `train_test_split(test_size=0.05, seed=42)`.
 - [ ] Prendre `split["test"]` **à partir de l'indice 500** (les 500 premiers ont servi de suivi
