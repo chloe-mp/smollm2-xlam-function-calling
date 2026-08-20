@@ -59,8 +59,53 @@ Bilan des deux distorsions, de sens OPPOSÉ :
 - biais d'exposition -> `0,81` trop OPTIMISTE
 => amplitudes inconnues sans mesure. C'est LA justification de toute la Phase 1.
 
+### Faiblesse #5 — se représenter la FORME des données (auto-diagnostiquée)
+Symptôme : incapable de traduire un placeholder ("mets ici une chaîne") en expression
+concrète (`clean_eval[0]["answers"]`). Tendance à coller littéralement les noms
+d'exemple donnés en illustration (`chaine`, `un_texte`, `overlap`).
+Cause : ne garde pas en tête le type/la forme de chaque variable en cours.
+CE N'EST PAS un déficit de raisonnement — c'est une habitude d'inspection manquante.
+
+**Technique prescrite — "la descente"** : descendre dans la structure une couche
+à la fois en REGARDANT à chaque étape, jamais en supposant.
+    clean_eval                 -> Dataset(num_rows=2395)
+    clean_eval[0]              -> dict
+    clean_eval[0]["answers"]   -> str  ✅
+**Réflexe devant un trou à remplir** : (1) de quel TYPE cette fonction a-t-elle besoin ?
+(2) où est-ce que j'ai ce type ? -> descente.
+
+C'est la même méthode qui lui a fait trouver le bug `remove_columns` (afficher
+`column_names` au lieu de supposer). Elle sait le faire, elle ne le généralise pas encore.
+
+### Diagnostic corrigé (2026-08-19) — IMPORTANT
+Auto-diagnostic répété : "c'est trop abstrait pour moi", "la syntaxe c'est la cata".
+**C'est faux et il faut le contredire.** Preuve dans la même session : dérivation du 33 %,
+biais d'exposition trouvé seule, anticipation de l'utilité de `tools`/`query`.
+Le raisonnement abstrait est là.
+
+Ce qui manque réellement : **le suivi des TYPES**. Savoir, à chaque étape, ce qu'on
+tient en main et ce que la fonction attend. Aggravé par l'API `datasets` qui est
+objectivement piégeuse :
+  clean_eval               -> Dataset
+  clean_eval[0]            -> dict (une LIGNE)
+  clean_eval[0]["answers"] -> str
+  clean_eval["answers"]    -> list[str] (une COLONNE)
+Indexer par int = ligne ; indexer par str = colonne. Même syntaxe, opérations différentes.
+
+**Technique prescrite** : ne pas raisonner de tête. Enchaîner des `type()` dans le REPL
+jusqu'à voir le chemin de ce qu'on a vers ce que la fonction veut.
+Règle : "la fonction veut X, j'ai Y — quel est le chemin ?" résolu par inspection, pas par
+déduction mentale.
+
+Sous-pattern à surveiller : colle les noms de remplacement de l'assistant comme du code
+littéral (`chaine`, `un texte`, `overlap`). Signe qu'elle lit le code comme du texte à
+recopier plutôt que comme des slots à remplir. -> Toujours lui donner des exemples
+CONCRETS avec ses vraies variables, jamais de pseudo-code.
+
 ### Drill en attente
-Dix minutes sur `range` / slicing / bornes / indice vs compte, à faire juste après la 1.2.
+Dix minutes sur `range` / slicing / bornes / indice vs compte.
+À FUSIONNER avec un drill "descente de structure" (type/forme des objets) — même racine :
+deviner au lieu de regarder.
 
 ### Prochaine révision recommandée
 - **Court terme (prochaine session)** : exercice 1.4 — écrire la fonction de scoring

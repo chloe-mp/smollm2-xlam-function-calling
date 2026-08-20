@@ -109,7 +109,25 @@ révision `050f71474648a88c470640c1b820aff9b8aa6113`
 **Leçon retenue** : un script qui se termine en silence ne valide rien.
 Toujours afficher de quoi confirmer (longueur attendue, colonnes attendues).
 
-### 1.3 Calibrer la génération
+### 1.3 Calibrer la génération  — mesure FAITE (2026-08-20)
+- [x] Longueurs en tokens des `answers` sur les 2395 exemples (tokenizer du modèle FT) :
+      **max = 410**, **moyenne = 56,1**
+- [x] **DÉCISION : `max_new_tokens = 512`** (410 + ~25% de marge + token de fin).
+      Le 256 de `inspect_xlam.py` était TROP BAS : il aurait tronqué de vraies bonnes
+      réponses et compté ça comme des échecs du modèle.
+- [x] Bonus : la moyenne réelle (56) valide l'hypothèse de ~50 tokens utilisée pour
+      la dérivation "81% token accuracy -> ~33% sur les tokens de contenu".
+
+**DÉCOUVERTE — typage incohérent dans la vérité terrain**
+xLAM mélange les conventions sur les nombres :
+  ex.1 : `{"page": "5"}`        <- chaîne
+  ex.2 : `{"rate": 3, "principal": 5000}`  <- entiers
+Même dataset, même type de champ. Le modèle NE PEUT PAS deviner laquelle utiliser.
+=> une partie des échecs au niveau 6 sera du bruit d'annotation, pas de l'incompétence.
+=> **DÉCISION : typage TOLÉRANT** au scoring (`"5"` == `5`), pour mesurer ce que le
+   modèle a compris et non ce que l'annotateur a tapé ce jour-là.
+
+### 1.3 bis — ancienne rédaction
 - [ ] Calculer la longueur en tokens du plus long `answers` de ton set d'éval.
 - [ ] En déduire `max_new_tokens` (cette valeur + marge). Sinon des réponses tronquées
       seront comptées comme fausses.
