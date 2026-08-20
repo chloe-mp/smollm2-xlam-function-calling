@@ -80,21 +80,34 @@ Si l'éval confirme -> le problème n'est pas le fine-tuning mais la capacité d
       Ni 500 ni 3000 en dur : constante nommée + longueur dérivée.
 - [x] VÉRIFIÉ EN VRAI : `len(eval_dataset)` = 2500 ✅
       `column_names` = ['id','query','answers','tools','messages'] ✅
-- [ ] RESTE : test de doublons. `train_test_split` partitionne, donc aucune ligne
+- [x] TEST DE DOUBLONS FAIT — et il a trouvé quelque chose.
+      93 `query` distinctes présentes des DEUX côtés du split => 105 lignes de l'éval
+      (un ensemble déduplique, un dataset non : 93 chaînes ≠ 105 lignes).
+      Retirées. Vérif de partition : 105 + 2395 = 2500 ✅
+
+---
+## DÉFINITION DU JEU D'ÉVALUATION (à citer avec tout chiffre reporté)
+1. `Salesforce/xlam-function-calling-60k`, split `train` (60 000 lignes)
+2. `.map(to_messages)` SANS `remove_columns` (garde query/tools/answers)
+3. `.train_test_split(test_size=0.05, seed=42)` -> test = 3000
+4. `.select(range(500, len(test)))` — saute les 500 vus pendant l'entraînement -> 2500
+5. Retrait des lignes dont la `query` apparaît aussi dans le train -> **2395 lignes**
+
+Modèle : `Chloemp/smollm2-135m-xlam-fullft`
+révision `050f71474648a88c470640c1b820aff9b8aa6113`
+---
+
+- [ ] Optionnel : ouvrir 1 des 105 contaminés des deux côtés et comparer `tools`+`answers`.
+      Si tout coïncide -> vrai doublon mémorisé. Si seule la `query` coïncide -> autre tâche,
+      retrait prudent mais discutable. Sert à justifier le retrait dans un futur écrit.
+
+**Ancienne rédaction du test (fausse, conservée)** : test de doublons. `train_test_split` partitionne, donc aucune ligne
       commune par construction — mais xLAM-60k peut contenir des `query` EN DOUBLE.
       Même texte, deux lignes distinctes, une de chaque côté du split = contamination réelle.
       Test qui vaut : intersection des ensembles de `query` train vs éval. Doit être vide.
 
 **Leçon retenue** : un script qui se termine en silence ne valide rien.
 Toujours afficher de quoi confirmer (longueur attendue, colonnes attendues).
-
-### 1.2 bis — ancienne rédaction (conservée pour mémoire)
-- [ ] Nouveau fichier `eval_xlam_job.py`, en-tête PEP 723 comme `train_xlam_job.py`.
-- [ ] Reproduire EXACTEMENT : `load_dataset` → `map(to_messages)` → `train_test_split(test_size=0.05, seed=42)`.
-- [ ] Prendre `split["test"]` **à partir de l'indice 500** (les 500 premiers ont servi de suivi
-      pendant l'entraînement → contaminés pour le choix de checkpoint).
-- **Fini quand** : tu as ~2500 exemples, et tu as vérifié par un test explicite
-      qu'aucune `query` de ton set d'éval n'apparaît dans `split["train"]`.
 
 ### 1.3 Calibrer la génération
 - [ ] Calculer la longueur en tokens du plus long `answers` de ton set d'éval.
