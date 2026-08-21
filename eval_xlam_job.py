@@ -36,8 +36,9 @@ MAX_NEW_TOKENS = 512
 DTYPE = torch.bfloat16
 
 MODEL_FT = "Chloemp/smollm2-135m-xlam-fullft"
-# Mets ici le SHA exact quand tu le connais :
-REVISION_FT = None  # ex. "abc123..."
+# Révision figée : les scores publiés se rattachent à ce SHA, pas à "main".
+# Sans ça, republier le modèle change silencieusement ce que l'éval mesure.
+REVISION_FT = "050f71474648a88c470640c1b820aff9b8aa6113"
 
 BASE_NAME = "HuggingFaceTB/SmolLM2-135M"
 INSTRUCT_NAME = "HuggingFaceTB/SmolLM2-135M-Instruct"
