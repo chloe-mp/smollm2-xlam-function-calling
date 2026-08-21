@@ -34,6 +34,37 @@ Révision finale : `050f71474648a88c470640c1b820aff9b8aa6113` ("End of training"
 l'espace dans le chemin est découpé par le shell en 2 arguments (word splitting).
 Toujours guillemeter un chemin contenant un espace : `git init "/chemin/avec espace"`.
 
+
+---
+# >>> REPRENDRE ICI <<<
+
+Tout ce qui précède est fait. Prochaine action, dans `main()` de `eval_xlam_job.py` :
+
+```python
+REVISION = "050f71474648a88c470640c1b820aff9b8aa6113"
+tok = AutoTokenizer.from_pretrained(HUB_MODEL_ID, revision=REVISION)
+model = AutoModelForCausalLM.from_pretrained(HUB_MODEL_ID, revision=REVISION)
+model.eval()
+tok.padding_side = "left"          # décodeur : le padding à droite casse la génération
+if tok.pad_token is None:
+    tok.pad_token = tok.eos_token
+```
+
+Puis, dans l'ordre (voir le détail plus bas) :
+3. prompts via `apply_chat_template(..., add_generation_prompt=True)`
+4. boucle par batchs de 32, `no_grad`, `do_sample=False`, `max_new_tokens=512`
+5. couper les tokens du prompt avant de décoder
+6. drapeau : la génération a-t-elle atteint 512 ?
+7. collecter id / query / tools / answers / prédiction / drapeau
+
+**Tester sur `.select(range(16))` en local AVANT de lancer les 2395.**
+
+Décision prise : évaluation en LOCAL (135M, ~30-60 min sur Mac).
+=> la 1.5 devient un simple écrit de fichier, la 1.6 disparaît.
+=> noter à côté du chiffre : float32 local, pas bf16 comme à l'entraînement.
+
+---
+
 ## Phase 1 — L'éval minimale qui vaut quelque chose
 
 ### 1.1 Vérifier que le run est sain  ✅ FAIT (2026-08-19)
