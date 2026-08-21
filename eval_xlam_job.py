@@ -1,13 +1,11 @@
 # /// script
 # requires-python = ">=3.12,<3.13"
 # dependencies = [
-#     "trl>=1.10",
 #     "transformers>=4.46",
 #     "datasets",
 #     "torch",
 #     "hf_transfer",
 #     "accelerate",
-#     "trackio",
 # ]
 # ///
 
@@ -15,6 +13,8 @@ import json
 import logging
 import os
 import re
+import sys
+import threading
 from collections import Counter
 from typing import Any
 
@@ -597,5 +597,29 @@ def push_results(all_results: list[dict], metrics: dict, token: str) -> None:
     print("Done.")
 
 
+def exit_clean() -> None:
+    """Sort explicitement du processus.
+
+    Les runs précédents affichaient "Done." puis se terminaient en
+    "Job timeout" : le script allait au bout mais l'interpréteur ne rendait
+    pas la main, donc le job était facturé jusqu'au timeout. Un thread
+    non-daemon encore vivant empêche Python de sortir — on l'identifie avant
+    de forcer la sortie, pour savoir quoi corriger à la source.
+    """
+    restants = [
+        t.name
+        for t in threading.enumerate()
+        if t is not threading.main_thread() and not t.daemon
+    ]
+    if restants:
+        print(f"threads non-daemon encore actifs : {restants}")
+    else:
+        print("aucun thread bloquant — sortie immédiate")
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
+
+
 if __name__ == "__main__":
     main()
+    exit_clean()
