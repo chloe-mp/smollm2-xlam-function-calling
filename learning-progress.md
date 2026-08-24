@@ -107,10 +107,55 @@ Dix minutes sur `range` / slicing / bornes / indice vs compte.
 À FUSIONNER avec un drill "descente de structure" (type/forme des objets) — même racine :
 deviner au lieu de regarder.
 
+### Session 2026-08-21 — Éval complète livrée (quiz 2/5)
+
+L'exercice 1.4 est FAIT : scorer à 7 niveaux écrit, débuggé et tourné sur 500 held-out.
+Résultat : ft 23,8 % exact-match / meilleur prompting 1,6 % / baseline triviale 0,2 %,
+sur 7 conditions. Le scorer a survécu à 5 révisions successives en une journée.
+
+**Trois bugs, trois natures différentes — c'est la leçon de la journée :**
+  hashabilité    -> crash franc, trouvé SEULE, corrigé seule
+  right-padding  -> AUCUNE erreur, scores faux et publiables
+  skew 3.14/3.12 -> passe en local, casse sur le runner (PEP 649)
+Le deuxième est le dangereux : un chiffre stable, reproductible et faux. Corrélé à la
+longueur du prompt, donc touchant une sous-population identifiable -> ne s'annule pas
+en moyenne, contrairement à du bruit.
+
+### Signal fort à retenir (2026-08-21)
+**A contredit l'assistant sur le fond, et avait raison.** Sur « un reviewer dira qu'il
+manque le décodage contraint », elle répond « sur un 135M je ne sais pas si ça aurait
+changé grand chose ». Simulation sur ses propres prédictions : L3 23 % -> 79 % (+56),
+mais exact-match 1,6 % -> 3,2 % (+1,6 seulement). Son intuition d'ingénieure battait
+l'argument d'autorité. À lui rappeler la prochaine fois qu'elle doute de son niveau.
+
+Idem sur la relecture d'article : a relevé, à juste titre, qu'on lui reprochait
+l'absence d'une section dans un brouillon annoncé comme inachevé.
+
+### Angle mort confirmé : correctif appliqué ≠ mécanisme acquis
+Quiz raté (2/5) sur des bugs qu'elle avait corrigés de sa main le matin même.
+Nuance décisive : `EVAL_TODO.md` contenait DÉJÀ
+`tok.padding_side = "left"  # décodeur : le padding à droite casse la génération`.
+Elle avait la connaissance ; une réécriture du script l'a effacée.
+=> Ce n'est pas une lacune conceptuelle, c'est une **perte par refactor**.
+=> Remédiation : quand on remplace un bloc de code, énumérer les décisions qu'il
+   portait avant de le jeter. Le TODO était le bon réflexe, il n'a pas été relu.
+
+### Drill en attente
+Dix minutes sur `range` / slicing / bornes / indice vs compte.
+À FUSIONNER avec un drill "descente de structure" (type/forme des objets) — même racine :
+deviner au lieu de regarder.
+
 ### Prochaine révision recommandée
-- **Court terme (prochaine session)** : exercice 1.4 — écrire la fonction de scoring
-  normalisée (niveaux 1→7). C'est le cœur intellectuel de l'éval.
-- **J+3** : re-tester la contamination — "comment je reconstruis un split held-out
-  identique et comment je le vérifie ?" sans regarder les notes.
-- **J+7** : teacher forcing / compounding errors, et lecture de courbes
-  (plateau réel vs plateau causé par le LR schedule).
+- **J+2 (08-23)** : re-quiz à froid — (a) mécanisme exact du right-padding en génération
+  par batch (le modèle prédit depuis la DERNIÈRE position ; en right-padding c'est un PAD),
+  (b) PEP 649 et pourquoi aucun test local n'attrape un skew d'environnement.
+- **J+7** : vacuous truth dans un contexte neuf (`all([])`, et le piège
+  « toutes les validations sont passées » quand la liste de validations est vide).
+- **Plus tard, quand le post-training démarrera** : elle a déjà construit sans le savoir
+  le prérequis de GRPO — une fonction de récompense déterministe et graduée (`score_one`,
+  7 niveaux). Pour DPO : échantillonner k complétions, trier par score, paires best/worst
+  = labels de préférence gratuits. Le mode d'échec visé est identifié : le modèle s'arrête
+  après le premier appel (130 des 158 sous-prédictions sont à exactement −1 ; 39,8 % d'exact
+  match à 1 appel, 9,1 % à 2, 0 % à 4+).
+  Ressource : AVB (@neural_avb) — CPT/SFT/DPO/GRPO sur un 135M, 2 h 22
+  github.com/avbiswas/finetuning_recipes

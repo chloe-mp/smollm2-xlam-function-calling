@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640" width="900" height="640" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif">
+<rect width="900" height="640" fill="#fcfcfb"/>
+<text x="78" y="34" font-size="19" font-weight="600" fill="#0b0b0b">Convergence de l'entraînement — SmolLM2-135M sur xLAM (1 epoch, 3 563 steps)</text>
+<text x="78" y="56" font-size="13.5" fill="#52514e">L'eval loss se stabilise dès le step ~2 250, alors que le learning rate vaut encore 44 % de sa valeur initiale.</text>
+<line x1="78" y1="354.1" x2="866" y2="354.1" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="358.1" font-size="12" fill="#8a8880" text-anchor="end">0.81</text>
+<line x1="78" y1="294.5" x2="866" y2="294.5" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="298.5" font-size="12" fill="#8a8880" text-anchor="end">0.84</text>
+<line x1="78" y1="235.0" x2="866" y2="235.0" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="239.0" font-size="12" fill="#8a8880" text-anchor="end">0.87</text>
+<line x1="78" y1="175.4" x2="866" y2="175.4" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="179.4" font-size="12" fill="#8a8880" text-anchor="end">0.90</text>
+<line x1="78" y1="115.8" x2="866" y2="115.8" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="119.8" font-size="12" fill="#8a8880" text-anchor="end">0.93</text>
+<text x="78" y="80" font-size="13" font-weight="600" fill="#0b0b0b">Eval loss</text>
+<line x1="78" y1="566.0" x2="866" y2="566.0" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="570.0" font-size="12" fill="#8a8880" text-anchor="end">0</text>
+<line x1="78" y1="506.4" x2="866" y2="506.4" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="510.4" font-size="12" fill="#8a8880" text-anchor="end">2,5e-5</text>
+<line x1="78" y1="446.8" x2="866" y2="446.8" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="450.8" font-size="12" fill="#8a8880" text-anchor="end">5e-5</text>
+<text x="78" y="430" font-size="13" font-weight="600" fill="#0b0b0b">Learning rate <tspan font-weight="400" fill="#52514e">(scheduler linéaire)</tspan></text>
+<line x1="78.0" y1="566" x2="78.0" y2="571" stroke="#8a8880" stroke-width="1"/>
+<text x="78.0" y="588" font-size="12" fill="#8a8880" text-anchor="middle">0</text>
+<line x1="187.4" y1="566" x2="187.4" y2="571" stroke="#8a8880" stroke-width="1"/>
+<text x="187.4" y="588" font-size="12" fill="#8a8880" text-anchor="middle">500</text>
+<line x1="296.9" y1="566" x2="296.9" y2="571" stroke="#8a8880" stroke-width="1"/>
+<text x="296.9" y="588" font-size="12" fill="#8a8880" text-anchor="middle">1000</text>
+<line x1="406.3" y1="566" x2="406.3" y2="571" stroke="#8a8880" stroke-width="1"/>
+<text x="406.3" y="588" font-size="12" fill="#8a8880" text-anchor="middle">1500</text>
+<line x1="515.8" y1="566" x2="515.8" y2="571" stroke="#8a8880" stroke-width="1"/>
+<text x="515.8" y="588" font-size="12" fill="#8a8880" text-anchor="middle">2000</text>
+<line x1="625.2" y1="566" x2="625.2" y2="571" stroke="#8a8880" stroke-width="1"/>
+<text x="625.2" y="588" font-size="12" fill="#8a8880" text-anchor="middle">2500</text>
+<line x1="734.7" y1="566" x2="734.7" y2="571" stroke="#8a8880" stroke-width="1"/>
+<text x="734.7" y="588" font-size="12" fill="#8a8880" text-anchor="middle">3000</text>
+<line x1="844.1" y1="566" x2="844.1" y2="571" stroke="#8a8880" stroke-width="1"/>
+<text x="844.1" y="588" font-size="12" fill="#8a8880" text-anchor="middle">3500</text>
+<text x="472" y="612" font-size="12.5" fill="#52514e" text-anchor="middle">global step</text>
+<line x1="570.5" y1="88" x2="570.5" y2="566" stroke="#8a8880" stroke-width="1.5" stroke-dasharray="5 4"/>
+<rect x="578.5" y="98" width="196" height="42" rx="5" fill="#fcfcfb" stroke="#e6e5e0"/>
+<text x="588.5" y="116" font-size="12.5" font-weight="600" fill="#0b0b0b">plateau atteint (step 2 250)</text>
+<text x="588.5" y="132" font-size="12" fill="#52514e">LR encore à 1,8e-5 — 44 %</text>
+<polyline points="132.7,120.6 187.4,221.8 242.2,273.5 296.9,302.5 351.6,319.2 406.3,329.2 461.1,334.3 515.8,337.8 570.5,339.1 625.2,339.9 679.9,340.2 734.7,340.5 789.4,341.0 844.1,340.6 857.9,340.7" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="132.7" cy="120.6" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="187.4" cy="221.8" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="242.2" cy="273.5" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="296.9" cy="302.5" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="351.6" cy="319.2" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="406.3" cy="329.2" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="461.1" cy="334.3" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="515.8" cy="337.8" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="570.5" cy="339.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="625.2" cy="339.9" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="679.9" cy="340.2" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="734.7" cy="340.5" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="789.4" cy="341.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="844.1" cy="340.6" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="857.9" cy="340.7" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="144.7" y="125.6" font-size="12.5" font-weight="600" fill="#0b0b0b">0,928</text>
+<text x="857.9" y="326.7" font-size="12.5" font-weight="600" fill="#0b0b0b" text-anchor="end">0,817</text>
+<polyline points="88.9,448.4 99.9,450.1 110.8,451.8 121.8,453.4 132.7,455.1 143.7,456.8 154.6,458.4 165.6,460.1 176.5,461.8 187.4,463.5 198.4,465.1 209.3,466.8 220.3,468.5 231.2,470.2 242.2,471.8 253.1,473.5 264.1,475.2 275.0,476.9 285.9,478.5 296.9,480.2 307.8,481.9 318.8,483.5 329.7,485.2 340.7,486.9 351.6,488.6 362.6,490.2 373.5,491.9 384.4,493.6 395.4,495.3 406.3,496.9 417.3,498.6 428.2,500.3 439.2,502.0 450.1,503.6 461.1,505.3 472.0,507.0 482.9,508.6 493.9,510.3 504.8,512.0 515.8,513.7 526.7,515.3 537.7,517.0 548.6,518.7 559.6,520.4 570.5,522.0 581.4,523.7 592.4,525.4 603.3,527.0 614.3,528.7 625.2,530.4 636.2,532.1 647.1,533.7 658.1,535.4 669.0,537.1 679.9,538.8 690.9,540.4 701.8,542.1 712.8,543.8 723.7,545.5 734.7,547.1 745.6,548.8 756.6,550.5 767.5,552.1 778.4,553.8 789.4,555.5 800.3,557.2 811.3,558.8 822.2,560.5 833.2,562.2 844.1,563.9 855.1,565.5" fill="none" stroke="#4a3aa7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<line x1="78" y1="366" x2="866" y2="366" stroke="#8a8880" stroke-width="1"/>
+<line x1="78" y1="566" x2="866" y2="566" stroke="#8a8880" stroke-width="1"/>
+<text x="78" y="624" font-size="11.5" fill="#8a8880">Aucune remontée de l'eval loss sur l'ensemble du run : pas de surapprentissage. Meilleur point 0,8166 (step 3 250) — final 0,8167.</text>
+</svg>

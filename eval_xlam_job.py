@@ -3,6 +3,7 @@
 # dependencies = [
 #     "transformers>=4.46",
 #     "datasets",
+#     "pandas",
 #     "torch",
 #     "hf_transfer",
 #     "accelerate",
@@ -18,9 +19,10 @@ import threading
 from collections import Counter
 from typing import Any
 
+import pandas as pd
 import torch
 from datasets import Dataset, load_dataset
-from huggingface_hub import DatasetCard, HfApi, login
+from huggingface_hub import DatasetCard, HfApi, hf_hub_download, login
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
 logger = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ logger = logging.getLogger(__name__)
 SEED = 42
 TEST_SIZE = 0.05
 EVAL_SKIP = 500
-N_EVAL = 500  # ≥ 500 comme demandé en Phase 2
+N_EVAL = 2395  # jeu propre complet (2500 - 105 lignes contaminées)
 MAX_NEW_TOKENS = 512
 DTYPE = torch.bfloat16
 
@@ -58,12 +60,21 @@ MODELS_TO_EVAL = [
     # template qui l'enferme en mode "assistant" ? Supprime-la si tu veux
     # raccourcir le run.
     ("instruct-raw", INSTRUCT_NAME, None, "raw_fewshot"),
+    # Checkpoints intermédiaires, récupérés dans l'historique git du repo modèle
+    # (hub_strategy="every_save" a poussé un commit tous les 500 steps).
+    # But : l'eval loss plateaute dès ~2250 — la métrique de tâche aussi ?
+    ("ft-step1000", MODEL_FT, "fa451a32b95595afc1be9227ba789936e352d72b", "plain"),
+    ("ft-step2000", MODEL_FT, "e4c3406570f61f8a383f5a52f7d16a60c8d707e8", "plain"),
+    ("ft-step3000", MODEL_FT, "ff2ffbad2e81f882900dcdeb91a861e28b71f5ac", "plain"),
 ]
 
 # Conditions à exécuter dans ce run. Les autres sont conservées telles quelles
 # depuis le dataset de résultats existant sur le Hub (pas de réévaluation GPU).
 # Mets None pour tout relancer.
-RUN_ONLY = ["instruct-fewshot", "base-fewshot", "instruct-raw"]
+# Les checkpoints restants, sur les 2395, pour que la courbe exact-match vs
+# step soit mesurée à la même taille d'échantillon ET au même batch_size que
+# `ft` et `ft-step3000` (un batch_size différent déplace le score de ~1 pt).
+RUN_ONLY = ["ft-step1000", "ft-step2000"]
 
 N_SHOTS = 3  # exemples de format, tirés du TRAIN (jamais du held-out)
 MAX_INPUT_LEN = 3072  # marge : le few-shot rallonge le prompt
@@ -319,7 +330,15 @@ def generate_batch(
     tokenizer,
     prompts: list[str],
     device: str,
-) -> list[str]:
+) -> tuple[list[str], list[dict]]:
+    """Retourne (textes générés, métadonnées par exemple).
+
+    La métadonnée `truncated` distingue deux échecs que le score confond :
+    une génération qui a déraillé sans jamais émettre d'EOS, et une réponse
+    légitimement longue qu'on a coupée. Décision prise lors de la calibration
+    de MAX_NEW_TOKENS (max réel observé 410, plafond 512), perdue lors d'une
+    réécriture du script — rétablie ici.
+    """
     # Troncature à droite = on couperait la query elle-même, en silence.
     # On compte les cas plutôt que de les découvrir dans les scores.
     n_trunc = sum(
@@ -347,13 +366,24 @@ def generate_batch(
         outputs = model.generate(**inputs, generation_config=gen_config)
 
     # On ne garde que les nouveaux tokens
-    generated = []
+    eos_id = tokenizer.eos_token_id
+    generated, metas = [], []
     for i, out in enumerate(outputs):
         input_len = inputs["input_ids"][i].shape[0]
         gen_ids = out[input_len:]
         text = tokenizer.decode(gen_ids, skip_special_tokens=True).strip()
+
+        # Une séquence terminée contient son EOS (les rangs suivants sont du
+        # padding). Une séquence qui a atteint le plafond n'en contient aucun.
+        hits = (gen_ids == eos_id).nonzero()
+        if len(hits):
+            n_gen, truncated = int(hits[0][0]) + 1, False
+        else:
+            n_gen, truncated = int(gen_ids.shape[0]), True
+
         generated.append(text)
-    return generated
+        metas.append({"n_gen_tokens": n_gen, "truncated": truncated})
+    return generated, metas
 
 
 # ---------------------------------------------------------------------------
@@ -430,17 +460,21 @@ def main():
         )
         model.eval()
 
-        preds = []
-        batch_size = 8
+        preds, metas = [], []
+        # 24 Go de VRAM pour 270 Mo de poids : à 8, le GPU attend plus qu'il
+        # ne calcule. Gain sous-linéaire (un batch tourne jusqu'à ce que sa
+        # séquence la plus longue finisse), mais net.
+        batch_size = 32
         for i in range(0, len(eval_ds), batch_size):
             batch = eval_ds.select(range(i, min(i + batch_size, len(eval_ds))))
             prompts = [
                 build_prompt(tok, ex, prompt_mode, fewshot_block) for ex in batch
             ]
-            batch_preds = generate_batch(model, tok, prompts, device)
+            batch_preds, batch_meta = generate_batch(model, tok, prompts, device)
             if prompt_mode == "raw_fewshot":
                 batch_preds = [cut_at_stop(t) for t in batch_preds]
             preds.extend(batch_preds)
+            metas.extend(batch_meta)
             if (i // batch_size) % 10 == 0:
                 print(f"  generated {i + len(batch_preds)}/{len(eval_ds)}")
 
@@ -448,7 +482,7 @@ def main():
         level_counts = {f"level_{i}": 0 for i in range(1, 8)}
         detailed = []
 
-        for idx, (ex, pred_text) in enumerate(zip(eval_ds, preds)):
+        for idx, (ex, pred_text, meta) in enumerate(zip(eval_ds, preds, metas)):
             tools_names = extract_tool_names(ex["tools"])
             scores = score_one(pred_text, ex["answers"], tools_names)
             for k, v in scores.items():
@@ -463,6 +497,7 @@ def main():
                     "tools": ex["tools"],
                     "gold": ex["answers"],
                     "pred": pred_text,
+                    **meta,
                     **scores,
                 }
             )
@@ -472,6 +507,8 @@ def main():
         metrics[model_key] = model_metrics
         all_results.extend(detailed)
 
+        n_trunc = sum(m["truncated"] for m in metas)
+        print(f"  générations tronquées à {MAX_NEW_TOKENS} tokens : {n_trunc}/{len(metas)}")
         print(f"Metrics {model_key}:")
         for k, v in model_metrics.items():
             print(f"  {k}: {v}%")
@@ -503,6 +540,8 @@ def run_baseline(eval_ds, extract_tool_names, all_results, metrics):
             {
                 "model": "baseline",
                 "prompt_mode": "n/a",
+                "n_gen_tokens": 0,
+                "truncated": False,
                 "query": ex["query"],
                 "tools": ex["tools"],
                 "gold": ex["answers"],
@@ -521,15 +560,40 @@ def merge_with_previous(new_rows: list[dict], run_keys: list[str], token: str) -
     push_to_hub écrase le split : sans ça, un run partiel effacerait les
     résultats des conditions qu'on vient de ne PAS réévaluer.
     """
+    api = HfApi(token=token)
     try:
-        old = load_dataset(HUB_DATASET_ID, split="train", token=token)
-    except Exception as e:  # dataset absent au tout premier run
-        print(f"  pas de résultats précédents ({type(e).__name__}) — on repart de zéro")
+        api.dataset_info(HUB_DATASET_ID)
+    except Exception:
+        print("  dataset inexistant — premier run, rien à conserver")
         return new_rows
+
+    # On lit le parquet directement plutôt que par load_dataset : ce dernier
+    # valide contre le bloc `dataset_info` du README, qui se désynchronise dès
+    # qu'on ajoute une colonne. Une carte périmée ne doit pas empêcher de
+    # relire des données parfaitement saines.
+    try:
+        path = hf_hub_download(
+            HUB_DATASET_ID,
+            "data/train-00000-of-00001.parquet",
+            repo_type="dataset",
+            token=token,
+        )
+        old = pd.read_parquet(path).to_dict("records")
+    except Exception as e:
+        # Le dataset existe mais on n'a pas su le lire : pousser maintenant
+        # effacerait toutes les conditions non rejouées. On s'arrête net.
+        raise RuntimeError(
+            f"{HUB_DATASET_ID} existe mais est illisible "
+            f"({type(e).__name__}: {e}). Pousser écraserait les conditions "
+            f"non rejouées ({sorted(set(run_keys))} seulement seraient gardées). "
+            "Vérifie le repo, puis relance."
+        ) from e
 
     kept = [dict(r) for r in old if r["model"] not in run_keys]
     for r in kept:
         r.setdefault("prompt_mode", "plain")  # runs antérieurs à cette colonne
+        r.setdefault("n_gen_tokens", -1)  # -1 = non mesuré (run antérieur)
+        r.setdefault("truncated", False)
     anciens = sorted({r["model"] for r in kept})
     print(f"  {len(kept)} lignes conservées des runs précédents : {anciens}")
     return kept + new_rows
