@@ -16,6 +16,10 @@ Fine-tuning LoRA / QLoRA de SmolLM2-1.7B sur xLAM function calling, pour HF Jobs
 Même données, même split, même prompt, même template que le full FT du 135M
 (train_xlam_job.py). Seuls changent : la taille du modèle et la méthode.
 
+Reprise après interruption (solde épuisé, timeout...) : relancer la même
+commande avec --resume (et le MÊME --run-name). Le run repart du dernier
+checkpoint poussé sur le Hub.
+
 Lancement (un job par méthode) :
     hf jobs uv run --flavor a100-large --timeout 3h --secrets HF_TOKEN \
       train_xlam_peft_job.py --method lora
@@ -34,6 +38,7 @@ import time
 
 import torch
 from datasets import load_dataset
+from huggingface_hub import snapshot_download
 from peft import LoraConfig
 from transformers import AutoTokenizer, BitsAndBytesConfig, TrainerCallback
 from trl import SFTConfig, SFTTrainer
@@ -100,6 +105,13 @@ def main() -> None:
     parser.add_argument(
         "--max-steps", type=int, default=-1, help="smoke test : ex. 20 (-1 = 1 epoch)"
     )
+    parser.add_argument(
+        "--resume", action="store_true", help="reprend depuis last-checkpoint/ du repo Hub"
+    )
+    # trackio ouvre les runs avec resume="allow" : un nom déjà utilisé AJOUTE
+    # les points à l'ancien run. Nouveau départ -> nouveau nom ; --resume ->
+    # même nom, pour que la courbe reprise continue la bonne.
+    parser.add_argument("--run-name", default=None, help="défaut : <method>-1.7b")
     args = parser.parse_args()
 
     token = os.environ["HF_TOKEN"]
@@ -170,12 +182,17 @@ def main() -> None:
         eval_steps=250,
         save_steps=500,
         save_total_limit=2,
-        run_name=f"{args.method}-1.7b" + ("-smoke" if smoke else ""),
+        run_name=(args.run_name or f"{args.method}-1.7b") + ("-smoke" if smoke else ""),
         # Pas de push en smoke test : on ne veut pas de repo pollué par 20 steps.
         push_to_hub=not smoke,
         hub_model_id=hub_model_id,
         hub_private_repo=False,
-        hub_strategy="every_save",  # pousse à chaque save_steps (≈8 checkpoints)
+        # "checkpoint" = every_save (adaptateur à la racine, à chaque save_steps)
+        # + le checkpoint COMPLET dans last-checkpoint/ : optimizer, scheduler,
+        # RNG, position dans les données. Sans ça, un run coupé à 40 min (vécu :
+        # solde épuisé au step ~1400) est perdu — l'adaptateur seul ne suffit
+        # pas à reprendre, AdamW repartirait de moments nuls et le LR de zéro.
+        hub_strategy="checkpoint",
         seed=SEED,
         report_to="trackio",
     )
@@ -197,9 +214,24 @@ def main() -> None:
     print(f"eos={tok.eos_token} pad={tok.pad_token} | Train : {len(train_dataset)} | Eval : {len(eval_dataset)}")
     print(f"Méthode : {args.method} | 4 bits : {getattr(trainer.model, 'is_loaded_in_4bit', False)}")
 
+    resume_from = None
+    if args.resume:
+        local = snapshot_download(
+            hub_model_id, allow_patterns=["last-checkpoint/*"], token=token
+        )
+        resume_from = os.path.join(local, "last-checkpoint")
+        if not os.path.isfile(os.path.join(resume_from, "trainer_state.json")):
+            raise FileNotFoundError(
+                f"Pas de last-checkpoint/ exploitable dans {hub_model_id} : "
+                "relancer sans --resume (run from scratch)."
+            )
+        print(f"Reprise depuis {hub_model_id}/last-checkpoint")
+
+    # Après une reprise, le pic mémoire et la durée ne couvrent que la partie
+    # reprise : run_stats.json le signale via "resumed".
     torch.cuda.reset_peak_memory_stats()
     t0 = time.time()
-    trainer.train()
+    trainer.train(resume_from_checkpoint=resume_from)
     elapsed = time.time() - t0
 
     # Le coût EST le résultat de LoRA vs QLoRA : on le persiste avec le modèle,
@@ -211,6 +243,7 @@ def main() -> None:
         "train_runtime_s": round(elapsed),
         "gpu": torch.cuda.get_device_name(0),
         "global_steps": trainer.state.global_step,
+        "resumed": args.resume,
     }
     print("RUN STATS :", json.dumps(stats))
     with open(os.path.join(training_args.output_dir, "run_stats.json"), "w") as f:
