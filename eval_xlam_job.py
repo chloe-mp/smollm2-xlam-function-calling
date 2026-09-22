@@ -7,6 +7,8 @@
 #     "torch",
 #     "hf_transfer",
 #     "accelerate",
+#     "peft",
+#     "bitsandbytes",
 # ]
 # ///
 
@@ -23,7 +25,13 @@ import pandas as pd
 import torch
 from datasets import Dataset, load_dataset
 from huggingface_hub import DatasetCard, HfApi, hf_hub_download, login
-from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
+from peft import PeftModel
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    GenerationConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +49,28 @@ MODEL_FT = "Chloemp/smollm2-135m-xlam-fullft"
 # Révision figée : les scores publiés se rattachent à ce SHA, pas à "main".
 # Sans ça, republier le modèle change silencieusement ce que l'éval mesure.
 REVISION_FT = "050f71474648a88c470640c1b820aff9b8aa6113"
+
+# Adaptateurs LoRA / QLoRA sur SmolLM2-1.7B (train_xlam_peft_job.py).
+# Ces repos ne contiennent que l'adaptateur (+ tokenizer) : le modèle de base
+# est lu dans adapter_config.json. Révisions à figer sur le commit
+# "End of training" de chaque repo, comme REVISION_FT — tant qu'elles valent
+# None, l'éval de ces conditions refuse de tourner (voir load_model).
+MODEL_LORA = "Chloemp/smollm2-1.7b-xlam-lora"
+MODEL_QLORA = "Chloemp/smollm2-1.7b-xlam-qlora"
+REVISION_LORA = None
+REVISION_QLORA = None
+
+# Conditions dont le modèle de base est chargé en 4 bits, avec EXACTEMENT la
+# config de quantification de l'entraînement. L'adaptateur QLoRA a appris à
+# corriger un base NF4 déquantifié, pas le base bf16 : l'évaluer sur le bf16
+# mesurerait un autre modèle que celui entraîné.
+EVAL_4BIT_BASE = {"qlora-1.7b"}
+BNB_4BIT = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+)
 
 BASE_NAME = "HuggingFaceTB/SmolLM2-135M"
 INSTRUCT_NAME = "HuggingFaceTB/SmolLM2-135M-Instruct"
@@ -66,6 +96,10 @@ MODELS_TO_EVAL = [
     ("ft-step1000", MODEL_FT, "fa451a32b95595afc1be9227ba789936e352d72b", "plain"),
     ("ft-step2000", MODEL_FT, "e4c3406570f61f8a383f5a52f7d16a60c8d707e8", "plain"),
     ("ft-step3000", MODEL_FT, "ff2ffbad2e81f882900dcdeb91a861e28b71f5ac", "plain"),
+    # Modèle plus gros, fine-tuning paramètre-efficace. Même prompt "plain"
+    # que `ft` : les deux adaptateurs ont été entraînés sur le même template.
+    ("lora-1.7b", MODEL_LORA, REVISION_LORA, "plain"),
+    ("qlora-1.7b", MODEL_QLORA, REVISION_QLORA, "plain"),
 ]
 
 # Conditions à exécuter dans ce run. Les autres sont conservées telles quelles
@@ -74,7 +108,7 @@ MODELS_TO_EVAL = [
 # Les checkpoints restants, sur les 2395, pour que la courbe exact-match vs
 # step soit mesurée à la même taille d'échantillon ET au même batch_size que
 # `ft` et `ft-step3000` (un batch_size différent déplace le score de ~1 pt).
-RUN_ONLY = ["ft-step1000", "ft-step2000"]
+RUN_ONLY = ["lora-1.7b", "qlora-1.7b"]
 
 N_SHOTS = 3  # exemples de format, tirés du TRAIN (jamais du held-out)
 MAX_INPUT_LEN = 3072  # marge : le few-shot rallonge le prompt
@@ -406,6 +440,65 @@ def baseline_trivial(tools_str: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Chargement des modèles
+# ---------------------------------------------------------------------------
+def is_adapter_repo(model_name: str, revision: str | None, token: str) -> bool:
+    return HfApi().file_exists(
+        model_name, "adapter_config.json", revision=revision, token=token
+    )
+
+
+def load_model(model_key: str, model_name: str, revision: str | None, token: str):
+    """Modèle complet, ou base + adaptateur PEFT si le repo est un adaptateur.
+
+    On charge le base et l'adaptateur SÉPARÉMENT plutôt que de laisser
+    AutoModelForCausalLM résoudre le repo adaptateur : `revision` doit
+    s'appliquer au repo de l'adaptateur, pas au base (où ce SHA n'existe pas).
+    """
+    if not is_adapter_repo(model_name, revision, token):
+        return AutoModelForCausalLM.from_pretrained(
+            model_name,
+            revision=revision,
+            dtype=DTYPE,
+            device_map="auto",
+            token=token,
+        )
+
+    if revision is None:
+        raise ValueError(
+            f"[{model_key}] adaptateur sans révision figée : renseigne le SHA du "
+            f"commit 'End of training' de {model_name} avant de publier un score."
+        )
+
+    cfg_path = hf_hub_download(
+        model_name, "adapter_config.json", revision=revision, token=token
+    )
+    with open(cfg_path) as f:
+        adapter_cfg = json.load(f)
+    base_name = adapter_cfg["base_model_name_or_path"]
+    quantized = model_key in EVAL_4BIT_BASE
+    print(f"  [{model_key}] base={base_name} | 4 bits={quantized} | adaptateur@{revision[:7]}")
+
+    base = AutoModelForCausalLM.from_pretrained(
+        base_name,
+        dtype=DTYPE,
+        device_map="auto",
+        quantization_config=BNB_4BIT if quantized else None,
+        token=token,
+    )
+    model = PeftModel.from_pretrained(base, model_name, revision=revision, token=token)
+
+    if quantized:
+        # Pas de fusion : fusionner dans des poids 4 bits requantifie le
+        # résultat (perte), et c'est justement la condition d'entraînement
+        # qu'on veut mesurer. On génère à travers l'adaptateur, plus lent.
+        return model
+    # LoRA sur base bf16 : fusion W + BA en bf16. Même modèle mathématique,
+    # sans le surcoût de l'adaptateur à chaque token généré.
+    return model.merge_and_unload()
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main():
@@ -453,19 +546,16 @@ def main():
                 TEMPLATE_SOURCE, token=token
             ).chat_template
 
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            revision=revision,
-            torch_dtype=DTYPE,
-            device_map="auto",
-            token=token,
-        )
+        model = load_model(model_key, model_name, revision, token)
         model.eval()
 
         preds, metas = [], []
         # 24 Go de VRAM pour 270 Mo de poids : à 8, le GPU attend plus qu'il
         # ne calcule. Gain sous-linéaire (un batch tourne jusqu'à ce que sa
         # séquence la plus longue finisse), mais net.
+        # Gardé à 32 pour le 1.7B aussi : un autre batch_size déplace le score
+        # de ~1 pt. Coût : KV cache jusqu'à ~13 Go (32 x ~2100 tokens x 197 Ko)
+        # + 3,4 Go de poids -> lancer sur a100-large, pas a10g.
         batch_size = 32
         for i in range(0, len(eval_ds), batch_size):
             batch = eval_ds.select(range(i, min(i + batch_size, len(eval_ds))))
