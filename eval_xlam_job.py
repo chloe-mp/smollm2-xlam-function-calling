@@ -57,8 +57,8 @@ REVISION_FT = "050f71474648a88c470640c1b820aff9b8aa6113"
 # None, l'éval de ces conditions refuse de tourner (voir load_model).
 MODEL_LORA = "Chloemp/smollm2-1.7b-xlam-lora"
 MODEL_QLORA = "Chloemp/smollm2-1.7b-xlam-qlora"
-REVISION_LORA = None
-REVISION_QLORA = None
+REVISION_LORA = "8868bcd45fb4942552222602f539148799d6e593"
+REVISION_QLORA = "a7cd2365348afefd29ad03fd11ce8d0235d8ae78"
 
 # Conditions dont le modèle de base est chargé en 4 bits, avec EXACTEMENT la
 # config de quantification de l'entraînement. L'adaptateur QLoRA a appris à
