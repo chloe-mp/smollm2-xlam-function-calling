@@ -267,9 +267,14 @@ def score_one(
     pred_text: str, gold_text: str, available_tools: list[str]
 ) -> dict[str, bool]:
     """
-    Retourne un dict de 7 booléens (niveaux 1→7).
+    Retourne un dict de 6 booléens (niveaux 1→6), cumulatifs.
+
+    Le niveau 6 (arguments exacts) EST l'exact match : y parvenir suppose déjà
+    le bon schéma, les bons outils, la bonne cardinalité et le bon multiset de
+    noms. Une ancienne version exposait un niveau 7 séparé, strictement égal au
+    6 sur les 12 580 lignes évaluées — il a été fusionné.
     """
-    res = {f"level_{i}": False for i in range(1, 8)}
+    res = {f"level_{i}": False for i in range(1, 7)}
 
     # 1. JSON parsable
     pred = parse_json_safe(pred_text)
@@ -310,15 +315,12 @@ def score_one(
         return res
     res["level_5"] = True
 
-    # 6. Arguments : on considère exact match des appels normalisés (précision/rappel = 1.0)
+    # 6. Arguments exacts = exact match complet
     pred_norm = Counter(normalize_call(c) for c in pred)
     gold_norm = Counter(normalize_call(c) for c in gold)
     if pred_norm != gold_norm:
         return res
     res["level_6"] = True
-
-    # 7. Exact match complet (déjà vrai si on arrive ici)
-    res["level_7"] = True
     return res
 
 
@@ -479,7 +481,7 @@ def main():
                 print(f"  generated {i + len(batch_preds)}/{len(eval_ds)}")
 
         # Scoring
-        level_counts = {f"level_{i}": 0 for i in range(1, 8)}
+        level_counts = {f"level_{i}": 0 for i in range(1, 7)}
         detailed = []
 
         for idx, (ex, pred_text, meta) in enumerate(zip(eval_ds, preds, metas)):
@@ -528,7 +530,7 @@ def main():
 
 
 def run_baseline(eval_ds, extract_tool_names, all_results, metrics):
-    level_counts = {f"level_{i}": 0 for i in range(1, 8)}
+    level_counts = {f"level_{i}": 0 for i in range(1, 7)}
     for ex in eval_ds:
         pred_text = baseline_trivial(ex["tools"])
         tools_names = extract_tool_names(ex["tools"])
@@ -594,6 +596,9 @@ def merge_with_previous(new_rows: list[dict], run_keys: list[str], token: str) -
         r.setdefault("prompt_mode", "plain")  # runs antérieurs à cette colonne
         r.setdefault("n_gen_tokens", -1)  # -1 = non mesuré (run antérieur)
         r.setdefault("truncated", False)
+        # level_7 était un doublon strict de level_6 (vérifié sur 12 580
+        # lignes). Les snapshots antérieurs à la fusion le portent encore.
+        r.pop("level_7", None)
     anciens = sorted({r["model"] for r in kept})
     print(f"  {len(kept)} lignes conservées des runs précédents : {anciens}")
     return kept + new_rows
@@ -656,7 +661,7 @@ def push_results(all_results: list[dict], metrics: dict, token: str) -> None:
 
     print("\n===== RÉSUMÉ FINAL (conditions de ce run) =====")
     for model_key, m in metrics.items():
-        print(f"{model_key:18s}  exact-match (L7) = {m['level_7']}%")
+        print(f"{model_key:18s}  exact-match (L6) = {m['level_6']}%")
     print(f"\nRésultats détaillés → https://huggingface.co/datasets/{HUB_DATASET_ID}")
     print("Done.")
 
