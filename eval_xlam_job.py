@@ -730,10 +730,63 @@ def check_card_schema(results_ds: Dataset, token: str) -> None:
     print(f"     → corrige le bloc dataset_info du README de {HUB_DATASET_ID}")
 
 
+def make_card_pushable(token: str) -> None:
+    """Retire un bloc `dataset_info` incomplet, qui ferait planter le push.
+
+    datasets >= 4 met la carte à jour en faisant
+    `repo_info.download_size -= deleted_size`. Si le bloc dataset_info du
+    README a été écrit à la main sans `download_size` (c'est le cas ici :
+    features + num_examples seulement), la soustraction lève
+    `TypeError: NoneType -= int`. Le piège : ça arrive APRÈS l'upload des
+    données mais AVANT le commit — 1 h 45 de GPU perdue, rien sur le Hub.
+    Sans le bloc, push_to_hub le régénère complet.
+    """
+    try:
+        card = DatasetCard.load(HUB_DATASET_ID, token=token)
+    except Exception as e:
+        print(f"  (carte illisible : {type(e).__name__}, vérification ignorée)")
+        return
+    info = card.data.to_dict().get("dataset_info")
+    if isinstance(info, list):
+        info = info[0] if info else None
+    if not isinstance(info, dict) or info.get("download_size") is not None:
+        return
+    print("  carte sans download_size -> retrait du bloc dataset_info (régénéré au push)")
+    card.data.dataset_info = None
+    card.push_to_hub(HUB_DATASET_ID, repo_type="dataset", token=token)
+
+
+def push_parquet_directly(results_ds: Dataset, token: str) -> None:
+    """Repli : écrit le parquet à l'emplacement que merge_with_previous relit.
+
+    Même chemin que celui produit par push_to_hub, donc le prochain run
+    retrouve ses lignes. La carte reste périmée (check_card_schema le dira),
+    mais les données, elles, sont sauvées.
+    """
+    local = "results.parquet"
+    results_ds.to_parquet(local)
+    HfApi(token=token).upload_file(
+        path_or_fileobj=local,
+        path_in_repo="data/train-00000-of-00001.parquet",
+        repo_id=HUB_DATASET_ID,
+        repo_type="dataset",
+        commit_message="Résultats (repli : upload direct du parquet)",
+        token=token,
+    )
+    print("  repli réussi : données poussées, carte à rafraîchir")
+
+
 def push_results(all_results: list[dict], metrics: dict, token: str) -> None:
     print("\nPush des résultats sur le Hub...")
     results_ds = Dataset.from_list(all_results)
-    results_ds.push_to_hub(HUB_DATASET_ID, private=RESULTS_REPO_PRIVATE, token=token)
+    make_card_pushable(token)
+    try:
+        results_ds.push_to_hub(HUB_DATASET_ID, private=RESULTS_REPO_PRIVATE, token=token)
+    except Exception as e:
+        # Ne jamais laisser un échec de mise à jour de carte emporter le run :
+        # la génération coûte des heures de GPU, l'upload coûte 3 Mo.
+        print(f"  !! push_to_hub a échoué ({type(e).__name__}: {e})")
+        push_parquet_directly(results_ds, token)
     check_card_schema(results_ds, token)
 
     # Métriques agrégées
