@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 660" width="900" height="660" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif">
+<rect width="900" height="660" fill="#fcfcfb"/>
+<text x="78" y="34" font-size="19" font-weight="600" fill="#0b0b0b">L'entraînement a convergé au step 2 000</text>
+<text x="78" y="56" font-size="13.5" fill="#52514e">SmolLM2-135M sur xLAM — 4 checkpoints réévalués sur 2 395 exemples held-out décontaminés.</text>
+<text x="78" y="74" font-size="13.5" fill="#52514e">Sur la zone grisée, les deux métriques sont plates : 44 % du run sans gain mesurable.</text>
+<rect x="388.8" y="116" width="433.7" height="226" fill="#f0efe9"/>
+<rect x="388.8" y="424" width="433.7" height="156" fill="#f0efe9"/>
+<line x1="78" y1="321.1" x2="866" y2="321.1" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="325.1" font-size="12" fill="#8a8880" text-anchor="end">0.815</text>
+<line x1="78" y1="262.5" x2="866" y2="262.5" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="266.5" font-size="12" fill="#8a8880" text-anchor="end">0.822</text>
+<line x1="78" y1="203.9" x2="866" y2="203.9" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="207.9" font-size="12" fill="#8a8880" text-anchor="end">0.829</text>
+<line x1="78" y1="145.3" x2="866" y2="145.3" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="149.3" font-size="12" fill="#8a8880" text-anchor="end">0.836</text>
+<text x="78" y="104" font-size="13" font-weight="600" fill="#0b0b0b">Eval loss</text>
+<polyline points="111.3,145.6 180.7,215.8 250.0,258.1 319.4,279.3 388.8,294.1 458.1,299.6 527.5,303.0 596.9,304.6 666.2,305.7 735.6,307.8 805.0,306.1 822.4,306.5" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="111.3" cy="145.6" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="180.7" cy="215.8" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="250.0" cy="258.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="319.4" cy="279.3" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="388.8" cy="294.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="458.1" cy="299.6" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="527.5" cy="303.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="596.9" cy="304.6" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="666.2" cy="305.7" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="735.6" cy="307.8" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="805.0" cy="306.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="822.4" cy="306.5" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="606" y="328" font-size="12.5" font-weight="600" fill="#52514e" text-anchor="middle">&#916; 0,0015 sur 1 563 steps</text>
+<line x1="78" y1="550.0" x2="866" y2="550.0" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="554.0" font-size="12" fill="#8a8880" text-anchor="end">20.5 %</text>
+<line x1="78" y1="520.0" x2="866" y2="520.0" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="524.0" font-size="12" fill="#8a8880" text-anchor="end">21.0 %</text>
+<line x1="78" y1="490.0" x2="866" y2="490.0" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="494.0" font-size="12" fill="#8a8880" text-anchor="end">21.5 %</text>
+<line x1="78" y1="460.0" x2="866" y2="460.0" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="464.0" font-size="12" fill="#8a8880" text-anchor="end">22.0 %</text>
+<line x1="78" y1="430.0" x2="866" y2="430.0" stroke="#e6e5e0" stroke-width="1"/>
+<text x="68" y="434.0" font-size="12" fill="#8a8880" text-anchor="end">22.5 %</text>
+<text x="78" y="412" font-size="13" font-weight="600" fill="#0b0b0b">Exact-match (niveau 7)</text>
+<polyline points="111.3,535.0 388.8,477.4 666.2,482.2 822.4,472.0" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="111.3" cy="535.0" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="388.8" cy="477.4" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="666.2" cy="482.2" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="822.4" cy="472.0" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="111.3" y="555.0" font-size="12.5" font-weight="600" fill="#0b0b0b" text-anchor="middle">20,75 %</text>
+<text x="388.8" y="463.4" font-size="12.5" font-weight="600" fill="#0b0b0b" text-anchor="middle">21,71 %</text>
+<text x="666.2" y="502.2" font-size="12.5" font-weight="600" fill="#0b0b0b" text-anchor="middle">21,63 %</text>
+<text x="822.4" y="458.0" font-size="12.5" font-weight="600" fill="#0b0b0b" text-anchor="end">21,8 %</text>
+<line x1="111.3" y1="439.0" x2="388.8" y2="439.0" stroke="#8a8880" stroke-width="1"/>
+<line x1="111.3" y1="435.0" x2="111.3" y2="443.0" stroke="#8a8880" stroke-width="1"/>
+<line x1="388.8" y1="435.0" x2="388.8" y2="443.0" stroke="#8a8880" stroke-width="1"/>
+<text x="250.0" y="431.0" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">+0,96 pt — McNemar p = 0,013</text>
+<line x1="111.3" y1="580" x2="111.3" y2="585" stroke="#8a8880" stroke-width="1"/>
+<text x="111.3" y="602" font-size="12" fill="#8a8880" text-anchor="middle">1000</text>
+<line x1="250.0" y1="580" x2="250.0" y2="585" stroke="#8a8880" stroke-width="1"/>
+<text x="250.0" y="602" font-size="12" fill="#8a8880" text-anchor="middle">1500</text>
+<line x1="388.8" y1="580" x2="388.8" y2="585" stroke="#8a8880" stroke-width="1"/>
+<text x="388.8" y="602" font-size="12" fill="#8a8880" text-anchor="middle">2000</text>
+<line x1="527.5" y1="580" x2="527.5" y2="585" stroke="#8a8880" stroke-width="1"/>
+<text x="527.5" y="602" font-size="12" fill="#8a8880" text-anchor="middle">2500</text>
+<line x1="666.2" y1="580" x2="666.2" y2="585" stroke="#8a8880" stroke-width="1"/>
+<text x="666.2" y="602" font-size="12" fill="#8a8880" text-anchor="middle">3000</text>
+<line x1="805.0" y1="580" x2="805.0" y2="585" stroke="#8a8880" stroke-width="1"/>
+<text x="805.0" y="602" font-size="12" fill="#8a8880" text-anchor="middle">3500</text>
+<text x="472" y="626" font-size="12.5" fill="#52514e" text-anchor="middle">global step</text>
+<line x1="78" y1="342" x2="866" y2="342" stroke="#8a8880" stroke-width="1"/>
+<line x1="78" y1="580" x2="866" y2="580" stroke="#8a8880" stroke-width="1"/>
+<text x="78" y="644" font-size="11.5" fill="#8a8880">Au-dela du step 2 000, aucune transition n'est significative : p = 0,905 puis p = 0,716. Loss et exact-match s'accordent.</text>
+</svg>
