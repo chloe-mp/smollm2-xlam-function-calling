@@ -159,3 +159,99 @@ deviner au lieu de regarder.
   match à 1 appel, 9,1 % à 2, 0 % à 4+).
   Ressource : AVB (@neural_avb) — CPT/SFT/DPO/GRPO sur un 135M, 2 h 22
   github.com/avbiswas/finetuning_recipes
+
+---
+
+## 2026-09-22/23 — LoRA & QLoRA sur 1.7B, puis juge LLM
+
+### ⚠️ Nature de cette session — à lire avant le reste
+Session **déléguée** : scripts écrits par l'assistant, sur demande explicite.
+La règle d'`EVAL_TODO.md` (« je code, Claude relit ») n'a PAS été appliquée.
+Ce qui suit est donc un journal de RÉSULTATS et de PIÈGES, pas une preuve
+d'acquisition. Le contenu à s'approprier est listé en fin de section.
+
+### Résultat principal — le plafond du 135M était bien un plafond de capacité
+|                | exact-match | réf. non dérivables | jugé correct sur le reste |
+|----------------|-------------|---------------------|---------------------------|
+| lora-1.7b      | 75,11 %     | 127 (5,3 %)         | 84,55 %                   |
+| qlora-1.7b     | 72,61 %     | 134 (5,6 %)         | 82,29 %                   |
+| ft 135M        | 21,80 %     | —                   | —                         |
+
++53 points en passant de 135M full-FT à 1.7B LoRA, sur données identiques.
+L'hypothèse de la Phase 1.1 (« le levier, c'est un modèle plus gros ») est vérifiée.
+QLoRA : −2,5 pts d'exact-match pour −38 % de mémoire (5,87 Go vs 9,48 Go de pic),
+et 9 min de MOINS que LoRA sur A100 — la déquantification 4 bits coûte moins que
+la bande passante mémoire qu'elle économise. Contre-intuitif, mesuré.
+
+**Correction d'un chiffre publié** : `ft` = 21,80 % sur les 2395, pas 23,8 %.
+Le 23,8 % venait des 500 premiers. Même modèle, même révision, n plus grand.
+
+### Les 4 crashs de la session ont TOUS la même forme
+Un coût est payé, puis le processus meurt AVANT de persister quoi que ce soit.
+1. **trackio + LoRA** : au 1er push (step 500), `rank_pattern={}` du LoraConfig
+   devient un struct Parquet sans champ -> `ArrowNotImplementedError`. 2 × 15 min
+   d'A100 perdues. Le full-FT du 135M n'avait pas de `peft_config`, d'où l'absence
+   du bug avant.
+2. **Solde HF épuisé** : les deux runs coupés net à 40 min (steps 1394 et 1528).
+   `hub_strategy="every_save"` pousse l'adaptateur mais PAS l'optimizer
+   -> rien de reprenable. Corrigé en `"checkpoint"` (+ `--resume`).
+3. **`push_to_hub` de l'éval** : `repo_info.download_size -= deleted_size` avec
+   un `download_size` absent du README écrit à la main -> `TypeError`, APRÈS
+   l'upload des données et AVANT le commit. 1 h 45 d'A100 générée, zéro ligne
+   sur le Hub, scores visibles uniquement dans les logs.
+4. (Non-crash mais même famille) **`provider="auto"`** du juge : 0,06 appel/s
+   en charge soutenue contre 4,0/s sur provider épinglé. 17 h d'ETA au lieu de 20 min.
+
+=> **Règle à retenir** : tout ce qui coûte cher doit être persisté AVANT l'étape
+   décorative (mise à jour de carte, sync de dashboard). Le repli `push_parquet_directly`
+   applique ça : si le beau chemin échoue, écrire quand même le parquet brut.
+
+### Pièges d'API rencontrés (transférables)
+- `warmup_ratio` n'existe plus en transformers 5 : un float < 1 dans `warmup_steps`.
+- TRL charge les modèles en **float32 par défaut** : sans `dtype="bfloat16"` explicite,
+  un 1.7B pèse 6,8 Go au lieu de 3,4 et le « LoRA non quantifié » est faussement lourd.
+- `apply_chat_template(...)` renvoie un `BatchEncoding` en transformers 5 :
+  `len(...)` vaut 2 (le nombre de clés), pas la longueur en tokens. Piège de mesure.
+- Provider épinglé ≠ détail de perf : deux providers servent des quantifications
+  différentes du même modèle. Un verdict de juge ne doit pas dépendre du routage.
+
+### Juge LLM — ce que la session a démontré
+**Le barème est le juge.** Première version : 5 échecs sur 10 requalifiés en
+« équivalents », dont des coordonnées GPS différentes et `{"$lt": 30}` vs `"<30"`.
+Un juge permissif produit un score corrigé stable, reproductible et FAUX —
+exactement le mode d'échec du right-padding (session du 08-21).
+Correctifs qui ont marché :
+- rappeler au juge que le scorer normalise DÉJÀ le typage, donc toute différence
+  qu'il voit est réelle ;
+- **deux questions indépendantes** (`reference_derivable`, `verdict`) : en un seul
+  champ, la règle « dans le doute, incorrect » écrasait le signal de référence
+  inutilisable, qui est précisément ce qu'on cherchait ;
+- juger AUSSI les 3538 exact-match : ils forment un jeu de validation gratuit.
+  Résultat : **99,89 % d'accord**, 4 désaccords, tous du côté « la référence est
+  douteuse » — jamais en faveur du modèle. Le juge est prudent, pas complaisant.
+- déterminisme vérifié : deux passages sur 20 cas, 100 % de verdicts identiques.
+
+**Bon appel de Chloé** : avoir choisi de juger les 4790 prédictions et pas
+seulement les 1252 échecs, contre la recommandation de l'assistant (qui n'y voyait
+qu'un surcoût ×4). C'est ce choix qui a fourni le jeu de validation du juge, donc
+la seule raison de croire les chiffres corrigés. À relire le jour où l'argument
+d'autorité sera tentant — c'est le 3e cas noté dans ce fichier.
+
+### Ce qu'il reste à s'approprier (sinon la session ne compte pas)
+1. Re-dériver seule **pourquoi QLoRA peut être plus rapide que LoRA** (poids 4 bits
+   = moins d'octets lus par token ; la déquantification est du calcul, pas de la mémoire).
+2. Refaire à la main le calcul de **mémoire d'activation** qui impose batch 8 au lieu
+   de 16 sur un 1.7B, et le KV cache de l'éval (32 × 2100 × 197 Ko ≈ 13 Go).
+3. Réécrire `make_card_pushable` **sans regarder** : quelle est la condition exacte
+   qui fait planter `push_to_hub`, et pourquoi la supprimer suffit.
+4. Quiz à froid J+2 : les 4 crashs ci-dessus, énoncer pour chacun *à quel moment
+   précis* le processus meurt par rapport au moment où le coût est payé.
+
+### Suite logique
+- Analyse d'erreurs Phase 2 sur les **960 erreurs réelles** : 710 sont des valeurs
+  d'arguments (`wrong_value`). C'est un problème de contenu, pas de format — le
+  format est acquis à 99,2 % (niveau 1-2).
+- Les 257 références non dérivables sont identifiées ligne à ligne dans
+  `Chloemp/xlam-smollm2-judge-results` : matière à un set d'éval nettoyé.
+- DPO/GRPO : le juge fournit maintenant un signal de préférence en plus de
+  `score_one`, sur les cas où l'exact-match est muet.
