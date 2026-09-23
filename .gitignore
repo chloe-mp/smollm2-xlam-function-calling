@@ -3,3 +3,6 @@ sft_output/
 __pycache__/
 *.pyc
 .DS_Store
+judge_checkpoint.jsonl
+judge_results.parquet
+results.parquet
