@@ -1,0 +1,45 @@
+{
+  "juge": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+  "provider": "scaleway (épinglé)",
+  "temperature": 0,
+  "n_juges": 4790,
+  "erreurs_api_ou_parse": 5,
+  "dataset_verdicts": "Chloemp/xlam-smollm2-judge-results",
+  "source_predictions": "Chloemp/xlam-smollm2-eval-results",
+  "validation_sur_exact_match": {
+    "n": 3538,
+    "accord_pct": 99.89,
+    "desaccords": 4,
+    "note": "désaccords = erreurs du juge ; les 4 portent sur la qualité de la référence, pas sur la prédiction"
+  },
+  "echecs_exact_match": {
+    "n": 1252,
+    "incorrect": 960,
+    "correct": 287,
+    "reference_non_derivable": 257
+  },
+  "par_modele": {
+    "lora-1.7b": {
+      "exact_match_pct": 75.11,
+      "references_non_derivables": 127,
+      "references_non_derivables_pct": 5.3,
+      "juge_correct_hors_refs_inutilisables_pct": 84.55,
+      "n_retenus": 2265
+    },
+    "qlora-1.7b": {
+      "exact_match_pct": 72.61,
+      "references_non_derivables": 134,
+      "references_non_derivables_pct": 5.59,
+      "juge_correct_hors_refs_inutilisables_pct": 82.29,
+      "n_retenus": 2259
+    }
+  },
+  "categories_echecs_reels": {
+    "wrong_value": 708,
+    "missing_argument": 89,
+    "wrong_tool": 81,
+    "wrong_count": 74,
+    "malformed": 6,
+    "reference_not_derivable": 2
+  }
+}
