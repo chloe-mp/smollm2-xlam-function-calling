@@ -8,3 +8,4 @@ judge_results.parquet
 results.parquet
 learning-progress.md
 EVAL_TODO.md
+api_eval_results.parquet

@@ -75,6 +75,11 @@ BNB_4BIT = BitsAndBytesConfig(
 BASE_NAME = "HuggingFaceTB/SmolLM2-135M"
 INSTRUCT_NAME = "HuggingFaceTB/SmolLM2-135M-Instruct"
 
+# Prompting À LA MÊME TAILLE que les adaptateurs. Sans ça, l'écart
+# fine-tuning vs prompting est confondu avec l'écart 135M vs 1.7B : les
+# baselines de prompting existantes sont toutes sur le 135M.
+INSTRUCT_1_7B = "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+
 # (clé, modèle, révision, mode de prompt)
 #   plain        : system minimal + query, via chat template  (condition d'origine)
 #   fewshot      : system + format explicite + N exemples, via chat template
@@ -100,6 +105,12 @@ MODELS_TO_EVAL = [
     # que `ft` : les deux adaptateurs ont été entraînés sur le même template.
     ("lora-1.7b", MODEL_LORA, REVISION_LORA, "plain"),
     ("qlora-1.7b", MODEL_QLORA, REVISION_QLORA, "plain"),
+    # Le vrai point de comparaison : même modèle de base, même taille,
+    # prompté au lieu d'être fine-tuné.
+    #   plain   : le prompt exact de l'entraînement (ne dit pas le format)
+    #   fewshot : format explicite + 3 exemples tirés du TRAIN
+    ("instruct-1.7b", INSTRUCT_1_7B, None, "plain"),
+    ("instruct-1.7b-fewshot", INSTRUCT_1_7B, None, "fewshot"),
 ]
 
 # Conditions à exécuter dans ce run. Les autres sont conservées telles quelles
@@ -108,7 +119,7 @@ MODELS_TO_EVAL = [
 # Les checkpoints restants, sur les 2395, pour que la courbe exact-match vs
 # step soit mesurée à la même taille d'échantillon ET au même batch_size que
 # `ft` et `ft-step3000` (un batch_size différent déplace le score de ~1 pt).
-RUN_ONLY = ["lora-1.7b", "qlora-1.7b"]
+RUN_ONLY = ["instruct-1.7b", "instruct-1.7b-fewshot"]
 
 N_SHOTS = 3  # exemples de format, tirés du TRAIN (jamais du held-out)
 MAX_INPUT_LEN = 3072  # marge : le few-shot rallonge le prompt
@@ -440,6 +451,22 @@ def baseline_trivial(tools_str: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Helpers scoring
+# ---------------------------------------------------------------------------
+def extract_tool_names(tools_field) -> list[str]:
+    """Noms des outils proposés dans le prompt (niveau 3 : hallucination).
+
+    Au niveau module et non imbriquée dans main() : eval_api_job.py la
+    réutilise, et deux implémentations du même parsing divergent tôt ou tard.
+    """
+    try:
+        tools = json.loads(tools_field) if isinstance(tools_field, str) else tools_field
+        return [t["name"] for t in tools]
+    except (json.JSONDecodeError, TypeError, KeyError):
+        return []
+
+
+# ---------------------------------------------------------------------------
 # Chargement des modèles
 # ---------------------------------------------------------------------------
 def is_adapter_repo(model_name: str, revision: str | None, token: str) -> bool:
@@ -512,16 +539,6 @@ def main():
     fewshot_block = build_fewshot_block(shots)
     print(f"Few-shot : {len(shots)} exemples tirés du train ({len(fewshot_block)} chars)")
     print(f"Éval clean size: {len(eval_ds)}")
-
-    # On prépare les tools disponibles (liste de noms)
-    def extract_tool_names(tools_field):
-        try:
-            tools = (
-                json.loads(tools_field) if isinstance(tools_field, str) else tools_field
-            )
-            return [t["name"] for t in tools]
-        except (json.JSONDecodeError, TypeError, KeyError):
-            return []
 
     all_results = []
     metrics = {}
