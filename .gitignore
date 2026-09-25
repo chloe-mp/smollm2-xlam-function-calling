@@ -6,3 +6,5 @@ __pycache__/
 judge_checkpoint.jsonl
 judge_results.parquet
 results.parquet
+learning-progress.md
+EVAL_TODO.md
