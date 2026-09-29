@@ -29,6 +29,16 @@ Lancement (un job par méthode) :
 LoRA vs QLoRA ne diffèrent QUE par la quantification 4 bits du modèle de base :
 même rang, mêmes modules, même LR. Sinon la comparaison ne mesure plus la
 quantification mais un mélange d'hyperparamètres.
+
+--base instruct : même recette, mais en partant de SmolLM2-1.7B-Instruct au
+lieu du base. Question testée : sur des outils absents de xLAM, le LoRA parti
+du base (60 %) fait moins bien que l'Instruct sans fine-tuning (80 %)
+(test_outils_inconnus.py). Est-ce le point de départ (le base n'a jamais eu de
+post-entraînement généraliste) ou le fine-tuning qui efface une compétence ?
+    hf jobs uv run --flavor a100-large --timeout 3h --secrets HF_TOKEN \
+      train_xlam_peft_job.py --method lora --base instruct
+Seul le modèle de départ change (données, split, prompt, template, LR, rang
+identiques), pour que l'écart mesuré lui soit attribuable.
 """
 
 import argparse
@@ -51,12 +61,22 @@ SEED = 42
 TEST_SIZE = 0.05
 EVAL_SUBSET = 500  # sous-échantillon pour le suivi pendant l'entraînement
 
-MODEL_NAME = "HuggingFaceTB/SmolLM2-1.7B"
+BASES = {
+    "base": "HuggingFaceTB/SmolLM2-1.7B",
+    # Vocab identique au base et rendu du template byte-identique (vérifié) ;
+    # seul l'eos diffère : <|im_end|> au lieu de <|endoftext|>, ce qui colle
+    # à la fin de tour du template.
+    "instruct": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+}
 # Template byte-identique à celui du 135M-Instruct (vérifié), et aucun token à
 # ajouter : <|im_start|>/<|im_end|> existent déjà dans le vocab du base 1.7B.
 # Donc pas d'embeddings neufs à entraîner, LoRA suffit.
 TEMPLATE_SOURCE = "HuggingFaceTB/SmolLM2-1.7B-Instruct"
-HUB_MODEL_ID = "Chloemp/smollm2-1.7b-xlam-{method}"
+# Le repo "base" garde son nom d'origine : les résultats publiés y renvoient.
+HUB_MODEL_IDS = {
+    "base": "Chloemp/smollm2-1.7b-xlam-{method}",
+    "instruct": "Chloemp/smollm2-1.7b-instruct-xlam-{method}",
+}
 
 SYSTEM_PROMPT = "You are a function-calling assistant. Available tools:\n{tools}"
 
@@ -103,6 +123,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--method", choices=["lora", "qlora"], required=True)
     parser.add_argument(
+        "--base", choices=list(BASES), default="base", help="modèle de départ (défaut : base)"
+    )
+    parser.add_argument(
         "--max-steps", type=int, default=-1, help="smoke test : ex. 20 (-1 = 1 epoch)"
     )
     parser.add_argument(
@@ -111,11 +134,15 @@ def main() -> None:
     # trackio ouvre les runs avec resume="allow" : un nom déjà utilisé AJOUTE
     # les points à l'ancien run. Nouveau départ -> nouveau nom ; --resume ->
     # même nom, pour que la courbe reprise continue la bonne.
-    parser.add_argument("--run-name", default=None, help="défaut : <method>-1.7b")
+    parser.add_argument(
+        "--run-name", default=None, help="défaut : <method>-1.7b (ou <method>-1.7b-instruct)"
+    )
     args = parser.parse_args()
 
     token = os.environ["HF_TOKEN"]
-    hub_model_id = HUB_MODEL_ID.format(method=args.method)
+    model_name = BASES[args.base]
+    hub_model_id = HUB_MODEL_IDS[args.base].format(method=args.method)
+    default_run_name = f"{args.method}-1.7b" + ("-instruct" if args.base == "instruct" else "")
     smoke = args.max_steps > 0
 
     # --- Données (identique au full FT) ----------------------------------------
@@ -149,7 +176,7 @@ def main() -> None:
         task_type="CAUSAL_LM",
     )
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     # --- Entraînement --------------------------------------------------------
     training_args = SFTConfig(
@@ -182,7 +209,7 @@ def main() -> None:
         eval_steps=250,
         save_steps=500,
         save_total_limit=2,
-        run_name=(args.run_name or f"{args.method}-1.7b") + ("-smoke" if smoke else ""),
+        run_name=(args.run_name or default_run_name) + ("-smoke" if smoke else ""),
         # Pas de push en smoke test : on ne veut pas de repo pollué par 20 steps.
         push_to_hub=not smoke,
         hub_model_id=hub_model_id,
@@ -198,7 +225,7 @@ def main() -> None:
     )
 
     trainer = SFTTrainer(
-        model=MODEL_NAME,
+        model=model_name,
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
@@ -212,7 +239,8 @@ def main() -> None:
     trainer.model.print_trainable_parameters()
     tok = trainer.processing_class
     print(f"eos={tok.eos_token} pad={tok.pad_token} | Train : {len(train_dataset)} | Eval : {len(eval_dataset)}")
-    print(f"Méthode : {args.method} | 4 bits : {getattr(trainer.model, 'is_loaded_in_4bit', False)}")
+    print(f"Méthode : {args.method} | départ : {model_name} | repo : {hub_model_id}")
+    print(f"4 bits : {getattr(trainer.model, 'is_loaded_in_4bit', False)}")
 
     resume_from = None
     if args.resume:
@@ -238,7 +266,7 @@ def main() -> None:
     # pas seulement dans les logs (disque du job éphémère).
     stats = {
         "method": args.method,
-        "model": MODEL_NAME,
+        "model": model_name,
         "peak_gpu_mem_gb": round(torch.cuda.max_memory_allocated() / 1e9, 2),
         "train_runtime_s": round(elapsed),
         "gpu": torch.cuda.get_device_name(0),

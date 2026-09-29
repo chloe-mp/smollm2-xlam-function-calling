@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit xLAM</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e3e2dd;
+    --code: #f1f0ec; --accent: #2f5d8a; --ok: #2e7d4f; --ko: #b3412f; --warn: #a6741a;
+    --ok-bg: #e6f2ea; --ko-bg: #f7e6e2; --warn-bg: #f6eedd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614; --card: #1f1f1d; --text: #ecebe6; --muted: #9b9a93; --line: #34332f;
+      --code: #2a2926; --accent: #7fb0e0; --ok: #6cc592; --ko: #eb8b78; --warn: #e0b565;
+      --ok-bg: #1f3328; --ko-bg: #3a2420; --warn-bg: #3a3020;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 20px 16px 60px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  h1 { font-size: 18px; margin: 0; }
+  .progress { flex: 1 1 220px; }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .bar > div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  .small { font-size: 13px; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  .meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--code); color: var(--muted); }
+  .badge.ambigu { background: var(--warn-bg); color: var(--warn); }
+  .query { font-size: 18px; font-weight: 600; margin: 4px 0 14px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 16px 0 6px; }
+  pre { background: var(--code); border-radius: 8px; padding: 10px 12px; margin: 0; overflow-x: auto;
+        font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+  details summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+  .question { margin: 18px 0 10px; font-weight: 600; }
+  .buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
+           border-radius: 8px; padding: 10px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button kbd { font-size: 11px; color: var(--muted); margin-left: 6px; }
+  button.sel.non_derivable { background: var(--ko-bg); border-color: var(--ko); color: var(--ko); }
+  button.sel.derivable { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
+  button.sel.incertain { background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
+  textarea { width: 100%; min-height: 56px; margin-top: 10px; font: inherit; padding: 8px 10px;
+             border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  .juge { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .juge .v { font-weight: 600; }
+  .juge .v.no { color: var(--ko); } .juge .v.yes { color: var(--ok); }
+  .accord { margin-top: 8px; font-size: 14px; }
+  nav { display: flex; gap: 8px; justify-content: space-between; margin-top: 14px; flex-wrap: wrap; }
+  .hidden { display: none; }
+  .aide { margin-top: 18px; }
+  @media (max-width: 560px) { .buttons { grid-template-columns: 1fr; } .query { font-size: 16px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Audit xLAM — références déductibles ?</h1>
+    <div class="progress">
+      <div class="small" id="compteur">Chargement…</div>
+      <div class="bar"><div id="barre"></div></div>
+    </div>
+  </header>
+
+  <div class="card" id="carte">
+    <div class="meta">
+      <span class="badge" id="type"></span>
+      <span class="small" id="ident"></span>
+      <span class="small" id="position"></span>
+    </div>
+    <div class="query" id="query"></div>
+
+    <h2>Référence (gold)</h2>
+    <pre id="gold"></pre>
+
+    <h2>Outils disponibles</h2>
+    <pre id="outils-resume"></pre>
+    <details><summary>Définitions complètes</summary><pre id="outils"></pre></details>
+
+    <div class="question">Un modèle pourrait-il produire cette référence à partir de la requête et des outils ?</div>
+    <div class="buttons">
+      <button data-v="non_derivable">Non déductible<kbd>1</kbd></button>
+      <button data-v="derivable">Déductible<kbd>2</kbd></button>
+      <button data-v="incertain">Incertain<kbd>3</kbd></button>
+    </div>
+    <textarea id="commentaire" placeholder="Commentaire (facultatif) — ex. « London absent de la requête »"></textarea>
+
+    <div class="juge hidden" id="juge">
+      <h2 style="margin-top:0">Avis du juge (révélé après ton verdict)</h2>
+      <div id="juge-details"></div>
+      <div class="accord" id="accord"></div>
+    </div>
+
+    <nav>
+      <button id="prec">← Précédent</button>
+      <button id="suivant-nv">Prochain non vérifié <kbd>N</kbd></button>
+      <button id="suiv">Suivant →</button>
+    </nav>
+  </div>
+
+  <p class="small aide">Raccourcis : <b>1</b> non déductible · <b>2</b> déductible · <b>3</b> incertain ·
+    <b>← →</b> naviguer · <b>N</b> prochain non vérifié. Chaque verdict est enregistré aussitôt dans
+    <code>a_verifier.csv</code>.</p>
+</main>
+
+<script>
+let cas = [], i = 0;
+const $ = (id) => document.getElementById(id);
+const joli = (s) => { try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; } };
+const LIBELLE = { non_derivable: "non déductible", derivable: "déductible", incertain: "incertain" };
+
+function resumeOutils(s) {
+  try {
+    return JSON.parse(s).map(t => `${t.name}(${Object.keys(t.parameters || {}).join(", ")})\n  ${t.description || ""}`).join("\n");
+  } catch { return s; }
+}
+
+function afficher() {
+  const c = cas[i];
+  $("type").textContent = c.a_verifier === "ambigu" ? "ambigu — juge contradictoire" : "échantillon";
+  $("type").className = "badge " + c.a_verifier;
+  $("ident").textContent = "xlam_id " + c.xlam_id;
+  const groupe = cas.filter(x => x.a_verifier === c.a_verifier);
+  const nomGroupe = c.a_verifier === "ambigu" ? "ambigu" : "échantillon";
+  $("position").textContent =
+    `${nomGroupe} ${groupe.indexOf(c) + 1} sur ${groupe.length} · cas ${i + 1} sur ${cas.length} au total`;
+  $("query").textContent = c.query;
+  $("gold").textContent = joli(c.gold);
+  $("outils-resume").textContent = resumeOutils(c.tools);
+  $("outils").textContent = joli(c.tools);
+  $("commentaire").value = c.commentaire || "";
+  document.querySelectorAll(".buttons button").forEach(b =>
+    b.className = b.dataset.v + (b.dataset.v === c.verdict_humain ? " sel" : ""));
+  afficherJuge();
+  compter();
+}
+
+function afficherJuge() {
+  const c = cas[i];
+  $("juge").classList.toggle("hidden", !c.verdict_humain);
+  if (!c.verdict_humain) return;
+  const lignes = ["lora-1.7b", "qlora-1.7b"].map(m => {
+    const d = c["derivable_" + m];
+    return `<p><span class="small">${m}</span> : <span class="v ${d}">${d === "no" ? "non déductible" : "déductible"}</span><br>
+            <span class="small">${(c["raison_" + m] || "").replace(/</g, "&lt;")}</span></p>`;
+  });
+  $("juge-details").innerHTML = lignes.join("");
+  const nonJuge = ["lora-1.7b", "qlora-1.7b"].filter(m => c["derivable_" + m] === "no").length;
+  let txt = "";
+  if (c.verdict_humain === "incertain") txt = "Tu as répondu « incertain » : exclu du calcul d'accord.";
+  else if (c.verdict_humain === "non_derivable") txt = `D'accord avec ${nonJuge}/2 verdicts du juge.`;
+  else txt = `D'accord avec ${2 - nonJuge}/2 verdicts du juge (le juge a produit ${nonJuge} faux positif${nonJuge > 1 ? "s" : ""}).`;
+  $("accord").textContent = txt;
+}
+
+function compter() {
+  const faits = cas.filter(c => c.verdict_humain).length;
+  const amb = cas.filter(c => c.a_verifier === "ambigu");
+  const ech = cas.filter(c => c.a_verifier !== "ambigu");
+  const fait = (l) => l.filter(c => c.verdict_humain).length;
+  $("compteur").textContent =
+    `Ambigus ${fait(amb)}/${amb.length} · Échantillon ${fait(ech)}/${ech.length} · Total ${faits}/${cas.length}`;
+  $("barre").style.width = (100 * faits / cas.length) + "%";
+}
+
+async function enregistrer(verdict) {
+  const c = cas[i];
+  if (verdict !== undefined) c.verdict_humain = verdict;
+  c.commentaire = $("commentaire").value;
+  const r = await fetch("/api/verdict", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ xlam_id: c.xlam_id, verdict_humain: c.verdict_humain, commentaire: c.commentaire }) });
+  if (!r.ok) alert("Échec de l'enregistrement : " + (await r.text()));
+}
+
+async function aller(n) {
+  if ($("commentaire").value !== (cas[i].commentaire || "")) await enregistrer();
+  i = (n + cas.length) % cas.length; afficher(); window.scrollTo(0, 0);
+}
+const prochainNonVerifie = () => {
+  for (let k = 1; k <= cas.length; k++) { const j = (i + k) % cas.length; if (!cas[j].verdict_humain) return aller(j); }
+};
+
+document.querySelectorAll(".buttons button").forEach(b =>
+  b.addEventListener("click", async () => { await enregistrer(b.dataset.v); afficher(); }));
+$("prec").onclick = () => aller(i - 1);
+$("suiv").onclick = () => aller(i + 1);
+$("suivant-nv").onclick = prochainNonVerifie;
+$("commentaire").addEventListener("blur", () => enregistrer());
+document.addEventListener("keydown", async (e) => {
+  if (e.target.tagName === "TEXTAREA" || e.metaKey || e.ctrlKey) return;
+  const v = { "1": "non_derivable", "2": "derivable", "3": "incertain" }[e.key];
+  if (v) { await enregistrer(v); afficher(); }
+  else if (e.key === "ArrowRight") aller(i + 1);
+  else if (e.key === "ArrowLeft") aller(i - 1);
+  else if (e.key.toLowerCase() === "n") prochainNonVerifie();
+});
+
+fetch("/api/cas").then(r => r.json()).then(d => {
+  // Les ambigus (juge contradictoire) d'abord : ce sont eux qui tranchent la question.
+  cas = [...d.filter(c => c.a_verifier === "ambigu"), ...d.filter(c => c.a_verifier !== "ambigu")];
+  const j = cas.findIndex(c => !c.verdict_humain);
+  i = j < 0 ? 0 : j;
+  afficher();
+});
+</script>
+</body>
+</html>

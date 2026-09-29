@@ -60,6 +60,14 @@ MODEL_QLORA = "Chloemp/smollm2-1.7b-xlam-qlora"
 REVISION_LORA = "8868bcd45fb4942552222602f539148799d6e593"
 REVISION_QLORA = "a7cd2365348afefd29ad03fd11ce8d0235d8ae78"
 
+# Même recette LoRA, mais partie de SmolLM2-1.7B-Instruct au lieu du base
+# (train_xlam_peft_job.py --base instruct). Question : l'écart outils connus /
+# outils inconnus vient-il du point de départ ou du fine-tuning ?
+# Révision à figer sur le commit "End of training" une fois le run fini ;
+# tant qu'elle vaut None, load_model refuse de l'évaluer.
+MODEL_LORA_INSTRUCT = "Chloemp/smollm2-1.7b-instruct-xlam-lora"
+REVISION_LORA_INSTRUCT = "988889136d65e50bad0ec9dd974dfbf227752a2a"  # End of training, 2026-09-27
+
 # Conditions dont le modèle de base est chargé en 4 bits, avec EXACTEMENT la
 # config de quantification de l'entraînement. L'adaptateur QLoRA a appris à
 # corriger un base NF4 déquantifié, pas le base bf16 : l'évaluer sur le bf16
@@ -111,6 +119,9 @@ MODELS_TO_EVAL = [
     #   fewshot : format explicite + 3 exemples tirés du TRAIN
     ("instruct-1.7b", INSTRUCT_1_7B, None, "plain"),
     ("instruct-1.7b-fewshot", INSTRUCT_1_7B, None, "fewshot"),
+    # LoRA parti de l'Instruct : même prompt "plain" que lora-1.7b (prompt
+    # d'entraînement), même batch_size, donc directement comparable à ses 75,1 %.
+    ("lora-instruct-1.7b", MODEL_LORA_INSTRUCT, REVISION_LORA_INSTRUCT, "plain"),
 ]
 
 # Conditions à exécuter dans ce run. Les autres sont conservées telles quelles
@@ -119,7 +130,7 @@ MODELS_TO_EVAL = [
 # Les checkpoints restants, sur les 2395, pour que la courbe exact-match vs
 # step soit mesurée à la même taille d'échantillon ET au même batch_size que
 # `ft` et `ft-step3000` (un batch_size différent déplace le score de ~1 pt).
-RUN_ONLY = ["instruct-1.7b", "instruct-1.7b-fewshot"]
+RUN_ONLY = ["lora-instruct-1.7b"]
 
 N_SHOTS = 3  # exemples de format, tirés du TRAIN (jamais du held-out)
 MAX_INPUT_LEN = 3072  # marge : le few-shot rallonge le prompt
