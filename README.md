@@ -2,7 +2,7 @@
 
 Fine-tuning SmolLM2 on [`Salesforce/xlam-function-calling-60k`](https://huggingface.co/datasets/Salesforce/xlam-function-calling-60k) — full fine-tune of a 135M, then LoRA and QLoRA on a 1.7B — with an evaluation harness built to be defensible, and an LLM-as-judge audit of the evaluation itself.
 
-The headline is not the score. It is that **20.5% of the benchmark's failures turned out to have ground truth no model could have produced.**
+The headline is not the score. It is that **about one in seven of the benchmark's failures was scored against ground truth no model could have produced** — 15.0% [95% CI: 12.7, 16.6], corrected by blind human review from the judge's raw 20.5%.
 
 ## Results
 
@@ -104,19 +104,23 @@ Of the 1,252 exact-match failures:
 
 The unusable-reference rate is nearly identical for both models (5.3% and 5.6% of their examples), as it should be for a property of the dataset rather than the model.
 
-Excluding unusable references, judged accuracy is **84.55%** (LoRA) and **82.29%** (QLoRA). Exact match remains the headline metric — it is deterministic, reproduces to the digit, and it was not badly wrong: 16 of the 25 missing points are genuine model errors.
+Excluding unusable references, judged accuracy is **84.55%** (LoRA) and **82.29%** (QLoRA) — computed from the raw flags; the human-review correction below shrinks the unusable share and moves these accuracies down by roughly one point. Exact match remains the headline metric — it is deterministic, reproduces to the digit, and it was not badly wrong: 16 of the 25 missing points are genuine model errors.
 
 Breakdown of the 960 real errors: wrong argument value 708, missing argument 89, wrong tool 81, wrong call count 74, malformed output 6.
 
 The judge was run on the LoRA and QLoRA from the base model only, not on the Instruct-based LoRA.
 
-### Checking the judge by hand (in progress)
+### Checking the judge by hand
 
 The 257 flagged failures are 147 distinct examples (both models fail on many of the same ones). For 114 of them, both verdicts say "not derivable"; for 33, one verdict says "not derivable" and the other says "derivable". Since derivability is a property of the reference, not of the prediction, those 33 are judge self-contradictions.
 
-`audit_xlam.py` maps each flagged example back to its original xLAM `id` and samples cases for blind human review (`audit_xlam/verifier.py` serves a local review page that hides the judge's verdict until the reviewer has answered).
+`audit_xlam.py` maps each flagged example back to its original xLAM `id` and samples cases for blind human review (`audit_xlam/verifier.py` serves a local review page that hides the judge's verdict until the reviewer has answered). All 83 sampled cases have now been reviewed: every contradictory flag, plus a random sample of 50 of the 114 consistent ones.
 
-All 33 contradictory cases have been reviewed: **9 references are truly not derivable, 15 are derivable, 9 are uncertain.** When the judge contradicts itself, it is usually wrong to call the reference impossible. The confirmed defects fall into a few kinds: opaque IDs with no documented mapping (a league or sport ID copied from the parameter example), unreplaced placeholders (`"<token_value>"`, credentials `"mysecret"` / `"mytoken"`), identifiers that are close but wrong (BART station `CIV` for `CIVC`), a Python expression instead of a value (`"math.pi"`), and a query word put in the wrong parameter (`datum: "tokyo"`). A random sample of 50 of the 114 consistent flags is next; it will give the judge's precision, and a corrected estimate of the unusable-reference rate. The 20.5% above should be read as an upper bound until then.
+**The judge's precision is 80.0% on consistent flags [95% CI: 67.0, 88.8], but only 27.3% [15.1, 44.2] on contradictory ones** — when the judge contradicts itself, it is usually wrong to call the reference impossible. One reviewed case also caught it conflating its own two questions, flagging a reference as underivable while its stated reason described the prediction's call count.
+
+Scaling the consistent flags by the measured precision, and adding the 9 confirmed contradictory ones, the corrected estimate is **15.0% of exact-match failures [12.7, 16.6] — about one failure in seven** — down from the 20.5% raw figure, and 4.2% of all held-out examples [3.6, 4.6]. Uncertain verdicts (2 of the 50 consistent, 9 of the 33 contradictory) are counted as derivable in this estimate; counting them as unusable instead raises it to 16.5% [14.2, 17.8]. Since the review only covers flagged failures, it measures the judge's precision, not its recall — unusable references the judge *missed* would push the true rate higher, so the corrected figure is a floor, not a ceiling.
+
+The confirmed defects fall into a few recurring kinds: references to content the request never supplies (a Sudoku board after "the following", "a specific post" with no post), coordinates demanded for a named place with no geocoding tool available — the single largest cluster — opaque IDs with no documented mapping (sometimes copied from the parameter example, sometimes mixing ID systems), unreplaced placeholders (`"<token_value>"`, `"next_cursor_value"`, `"MLB_LEAGUE_ID"`), values that require an arbitrary choice the request does not determine (a random draw frozen in the gold, truncation instead of rounding), identifiers that are close but wrong (BART station `CIV` for `CIVC`), a Python expression instead of a value (`"math.pi"`), golds omitting an argument the request explicitly gives, and one tool signature that no JSON call can express (a `Callable` parameter).
 
 ## Generalisation to unseen tools
 
@@ -177,6 +181,10 @@ uv run eval_api_job.py                # 300 examples, 2 prompt conditions
 
 **Datasets** — [eval results](https://huggingface.co/datasets/Chloemp/xlam-smollm2-eval-results) (25,155 scored predictions across 17 conditions) · [judge verdicts](https://huggingface.co/datasets/Chloemp/xlam-smollm2-judge-results) (4,790 verdicts)
 
+## Sibling project
+
+[**text2sql-lora**](https://github.com/chloe-mp/text2sql-lora) applies the same discipline to SQL generation, and adds the deployment half: execution accuracy instead of exact match (run both queries, compare result sets), and a promotion gate that **blocked** an adapter which gained 4.9 points in-domain while regressing 9.3 points out-of-domain — the model a single-suite evaluation would have shipped. The promoted adapter is [qwen3-4b-text2sql-lora](https://huggingface.co/Chloemp/qwen3-4b-text2sql-lora): 80.9% execution accuracy on Spider dev against 75.0% for the un-tuned base model.
+
 ## Setup
 
 SmolLM2-1.7B, LoRA r=16 α=32 on all linear layers, lr 2e-4, 3% warmup, 1 epoch (3,563 steps), effective batch 16, bf16, single A100. QLoRA identical but with an NF4 double-quantised base and bf16 compute. The Instruct-based LoRA is identical to the base LoRA apart from the starting checkpoint; the only side difference is the tokenizer's eos (`<|im_end|>` instead of `<|endoftext|>`), which matches the end-of-turn token of the shared chat template. It was trained in two jobs (interrupted at step 1500, resumed from the full Hub checkpoint). Data split with `test_size=0.05, seed=42`; the first 500 held-out examples are excluded because they were used for eval during training.
@@ -186,7 +194,7 @@ QLoRA adapters are evaluated on a 4-bit base with the training quantisation conf
 ## Limitations
 
 - **The split does not test unseen tools.** A random split of xLAM means nearly every tool in the eval set also appears in training. The headline numbers measure reliable calling of a known toolset on new phrasing; the unseen-tool probe above is only 20 queries.
-- **The judge's calibration is partial.** Human review so far covers only examples the judge flagged, which measures its precision but not what it misses; a Cohen's κ needs a sample of unflagged failures too.
+- **The judge's recall is unmeasured.** The human review covered only examples the judge flagged, so it measures precision (80% on consistent flags), not what the judge misses; a Cohen's κ needs a sample of unflagged failures too.
 - **One configuration.** One epoch, one LoRA rank, one learning rate. The LoRA/QLoRA comparison holds at exactly one point in that space.
 - **One dataset, single-turn.** No external benchmark, so nothing here is directly comparable to BFCL or similar leaderboards.
 - **The large-model comparison is a 300-example subset.** Enough to show a draw rather than a gap, not enough to resolve a few points either way.
