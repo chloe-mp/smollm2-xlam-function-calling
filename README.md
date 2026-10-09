@@ -147,7 +147,7 @@ Caveats: 20 queries, written and labelled by one person; tool descriptions trans
 |---|---|
 | `train_xlam_job.py` | Full fine-tune of SmolLM2-135M (HF Jobs, PEP 723 inline deps) |
 | `train_xlam_peft_job.py` | LoRA / QLoRA on SmolLM2-1.7B (`--base instruct` to start from the Instruct checkpoint), resumable from Hub checkpoints |
-| `eval_xlam_job.py` | 6-level scorer, 12 model conditions plus a trivial baseline, decontamination, results pushed to the Hub |
+| `eval_xlam_job.py` | 6-level scorer, 14 model conditions plus a trivial baseline, decontamination, results pushed to the Hub |
 | `judge_xlam_job.py` | LLM-as-judge audit, checkpointed and resumable |
 | `eval_api_job.py` | Same eval set and scorer against a large model via HF Inference Providers, no GPU |
 | `test_outils_inconnus.py` | Local probe on 20 queries against 4 tools absent from xLAM |

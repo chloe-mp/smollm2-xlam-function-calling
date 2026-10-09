@@ -41,5 +41,46 @@
     "wrong_count": 74,
     "malformed": 6,
     "reference_not_derivable": 2
+  },
+  "revue_humaine": {
+    "outil": "audit_xlam.py + audit_xlam/verifier.py (page locale, verdict du juge caché jusqu'à la réponse)",
+    "donnees": "audit_xlam/a_verifier.csv",
+    "exemples_signales": 147,
+    "relus": 83,
+    "signalements_coherents": {
+      "signales": 114,
+      "relus": 50,
+      "non_derivable": 40,
+      "derivable": 8,
+      "incertain": 2,
+      "precision_juge_pct": 80.0,
+      "ic95": [
+        67.0,
+        88.8
+      ]
+    },
+    "signalements_contradictoires": {
+      "signales": 33,
+      "relus": 33,
+      "non_derivable": 9,
+      "derivable": 15,
+      "incertain": 9,
+      "precision_juge_pct": 27.3,
+      "ic95": [
+        15.1,
+        44.2
+      ]
+    },
+    "taux_corrige": {
+      "part_des_echecs_exact_match_pct": 15.0,
+      "ic95": [
+        12.7,
+        16.6
+      ],
+      "part_du_held_out_pct": 4.2,
+      "variante_incertains_comptes_non_derivables_pct": 16.5,
+      "brut_avant_correction_pct": 20.5,
+      "nature": "plancher — seuls les cas SIGNALÉS ont été relus, donc on mesure la précision du juge, pas son rappel"
+    }
   }
 }
